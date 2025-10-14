@@ -1,2 +1,10 @@
 # google_sheets_large_data_request_to_api
 this is currently tuned to Club Automation data pulls.
+you need to add there script properties
+DAXKO_ACCESS_EXPIRES_AT
+DAXKO_ACCESS_TOKEN
+DAXKO_CLIENT_ID
+DAXKO_REFRESH_TOKEN
+DAXKO_REPORT1_STATE
+DAXKO_TOKEN_URL
+DIGEST_TO
