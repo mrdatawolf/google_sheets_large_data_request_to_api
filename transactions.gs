@@ -7,7 +7,7 @@
  *   CONFIG_TX.sheetName                 -> 'daxko_transactions'
  *   CONFIG_TX.chargesSheetName          -> 'daxko_transactions_charges'
  *
- * Raw .json.gz saved in CONFIG_TX.raw.driveFolderPath
+ * Raw .json/.json.gz saved in CONFIG_TX.raw.driveFolderPath
  * Audit -> CONFIG_TX.audit.sheetName
  * Digest email -> separate subject prefix (CONFIG.notifications.txSubjectPrefix)
  */
@@ -16,13 +16,14 @@
 
 function runTransactionSearchDaily() {
   var t0 = Date.now();
+  var status = 'SUCCESS';
+  var errorMsg = '';
 
+  // Initialize run flags (kept for diagnostics)
   RUN_FLAGS.didRefresh = false;
   RUN_FLAGS.parseMode = 'json';
   RUN_FLAGS.csvSanitized = false;
 
-  var status = 'SUCCESS';
-  var errorMsg = '';
   var startPage;
   var lastNonEmptyPage = null;
   var pagesFetched = 0;
@@ -41,7 +42,8 @@ function runTransactionSearchDaily() {
     startPage = CONFIG_TX.request.startPage;
     if (state && typeof state.page === 'number' && state.page >= 1 &&
         state.pageSize === currentPageSize) {
-      startPage = state.page; // re-scan last non-empty page (safe; we upsert)
+      // Re-scan last non-empty page (safe due to upsert)
+      startPage = state.page;
     }
 
     var page = startPage;
@@ -49,45 +51,60 @@ function runTransactionSearchDaily() {
     var chargeRecords = [];
 
     while (true) {
+      // Time budget guard (default ~4 min safety if not configured)
+      var budgetMs = (CONFIG_TX.runtime && CONFIG_TX.runtime.msBudget) || 240000;
+      if (!hasTimeLeft_(t0, budgetMs)) {
+        Logger.log('Time budget reached; stopping at page ' + page);
+        break;
+      }
+
       var body = buildTransactionBody_(page);
       var result = fetchTransactionsPagePost_(body, page);
       var payloadText = result.payloadText;
-      var resultsArr = result.results;  // array of invoice-level objects
+      var resultsArr = result.results || [];
       var rowCount = resultsArr.length;
-      pagesFetched++;
 
-      if (CONFIG_TX.raw.enabled && payloadText) {
+      if (CONFIG_TX.raw && CONFIG_TX.raw.enabled && payloadText) {
         saveRawPayloadTx_(payloadText, page);
         rawFilesSaved++;
       }
 
-      if (rowCount === 0) break;
+      if (rowCount === 0) {
+        // No more results
+        break;
+      }
+
+      pagesFetched++;
 
       // Flatten header + charges
       var flattened = flattenTransactions_(resultsArr, result.isCached);
-      headerRecords = headerRecords.concat(flattened.headers);
-      chargeRecords = chargeRecords.concat(flattened.charges);
+      headerRecords = headerRecords.concat(flattened.headers || []);
+      chargeRecords = chargeRecords.concat(flattened.charges || []);
 
       lastNonEmptyPage = page;
-      if (rowCount < currentPageSize) break; // last page
+      if (rowCount < currentPageSize) {
+        // Last page
+        break;
+      }
       page++;
     }
 
-    // Write sheets
+    // Write header sheet
     if (headerRecords.length > 0) {
-      ensureSheetWithHeaders_(CONFIG_TX.sheetName, TX_HEADER_FIELDS);
+      var headerSheet = ensureSheetWithHeaders_(CONFIG_TX.sheetName, TX_HEADER_FIELDS);
       var resH = upsertRowsToSheet_(headerRecords, CONFIG_TX.sheetName, CONFIG_TX.uniqueKey);
       headerAppended = resH.appended;
       headerUpdated  = resH.updated;
-      applyHeaderFormatsTx_(SpreadsheetApp.getActive().getSheetByName(CONFIG_TX.sheetName));
+      applyHeaderFormatsTx_(headerSheet);
     }
 
+    // Write charges sheet
     if (chargeRecords.length > 0) {
-      ensureSheetWithHeaders_(CONFIG_TX.chargesSheetName, TX_CHARGE_FIELDS);
+      var chargeSheet = ensureSheetWithHeaders_(CONFIG_TX.chargesSheetName, TX_CHARGE_FIELDS);
       var resC = upsertRowsToSheet_(chargeRecords, CONFIG_TX.chargesSheetName, 'InvoiceChargeKey');
       chargeAppended = resC.appended;
       chargeUpdated  = resC.updated;
-      applyChargeFormatsTx_(SpreadsheetApp.getActive().getSheetByName(CONFIG_TX.chargesSheetName));
+      applyChargeFormatsTx_(chargeSheet);
     }
 
     // Save resume state if we saw any data
@@ -95,6 +112,7 @@ function runTransactionSearchDaily() {
       setResumeStateTx_({
         page: lastNonEmptyPage,
         pageSize: Number(CONFIG_TX.request.pageSize),
+        // format: 'json', // optional parity with other modules
         updatedAt: new Date().toISOString()
       });
       resumeSavedPage = lastNonEmptyPage;
@@ -106,14 +124,14 @@ function runTransactionSearchDaily() {
   } finally {
     var durationMs = Date.now() - t0;
 
-    // We’ll report header counts in the standard fields and tuck charge counts into error tail if needed.
     var info = {
       runTimestamp: new Date(),
       status: status,
       startPage: startPage,
       lastNonEmptyPage: lastNonEmptyPage,
       pagesFetched: pagesFetched,
-      recordsFetched: headerAppended + headerUpdated, // header rows processed (approx)
+      // Note: this is "rows written (header)" not "results fetched"
+      recordsFetched: headerAppended + headerUpdated,
       appended: headerAppended,
       updated: headerUpdated,
       rawFilesSaved: rawFilesSaved,
@@ -121,42 +139,35 @@ function runTransactionSearchDaily() {
       resumeSavedPage: resumeSavedPage,
       format: 'json',
       pageSize: Number(CONFIG_TX.request.pageSize),
-      error: errorMsg,  // will be blank on success
+      error: errorMsg,  // '' on success
       refreshed: RUN_FLAGS.didRefresh ? 'yes' : 'no',
       parseMode: 'json',
       csvSanitized: 'no',
 
-      // Extra (not written to standard audit, but used by custom TX email):
+      // Extra counts for notifications
       txChargeAppended: chargeAppended,
       txChargeUpdated:  chargeUpdated
     };
 
-    // Write TX audit row
-    writeAuditLogTx_(info);
+    // TX audit row
+    try { writeAuditLogTx_(info); } catch (e1) { Logger.log('writeAuditLogTx_ failed: ' + e1); }
 
-    // Send TX digest (shows header adds/updates; we’ll append charge counts in the body)
-    sendRunDigestEmailFor_(info, {
-      subjectPrefix: (CONFIG.notifications && CONFIG.notifications.txSubjectPrefix) || '[Daxko TX]',
-      sheetName: CONFIG_TX.sheetName,
-      auditSheet: CONFIG_TX.audit.sheetName
-    });
+    // TX digest (plain text path; HTML/recipients handled by notifications.gs)
+    try {
+      sendRunDigestEmailFor_(info, {
+        subjectPrefix: (CONFIG.notifications && CONFIG.notifications.txSubjectPrefix) || '[Daxko TX]',
+        sheetName: CONFIG_TX.sheetName,
+        auditSheet: CONFIG_TX.audit.sheetName
+      });
+    } catch (e2) {
+      Logger.log('TX digest send failed: ' + e2);
+    }
   }
 }
 
 /** Install daily TX trigger */
 function setupTransactions() {
-  ensureAuditSheetTx_();
-  ensureSheetWithHeaders_(CONFIG_TX.sheetName, TX_HEADER_FIELDS);
-  ensureSheetWithHeaders_(CONFIG_TX.chargesSheetName, TX_CHARGE_FIELDS);
-
-  var triggers = ScriptApp.getProjectTriggers();
-  for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'runTransactionSearchDaily') {
-      ScriptApp.deleteTrigger(triggers[i]);
-    }
-  }
-  ScriptApp.newTrigger('runTransactionSearchDaily').timeBased().everyDays(1).create();
-  Logger.log('Transaction Search daily trigger created.');
+  setupReport(CONFIG_TX, 'runTransactionSearchDaily');
 }
 
 // ---- Constants for column order ----
@@ -175,20 +186,20 @@ var TX_CHARGE_FIELDS = [
 // ---- Body builder & HTTP fetch ----
 
 function buildTransactionBody_(page) {
-  // If you move dateFrom to a property TX_DATE_FROM, read it here.
-  var dateFrom = CONFIG_TX.request.dateFrom;
-  var dateTo = Utilities.formatDate(new Date(Date.now()), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  var dateFrom = CONFIG_TX.request.dateFrom; // "YYYY-MM-DD"
+  var dateTo = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   return {
-    dateFrom: dateFrom,                     // "YYYY-MM-DD"
-    dateTo: dateTo, // "YYYY-MM-DD"
-    page: String(page),                     // pagination field name is "page"
+    dateFrom: dateFrom,
+    dateTo: dateTo,
+    page: String(page),
     pageSize: String(CONFIG_TX.request.pageSize)
   };
 }
 
 function fetchTransactionsPagePost_(body, page) {
   var attempt = 0;
-  var backoff = CONFIG_TX.daxko.initialBackoffMs;
+  var backoff = Number(CONFIG_TX.daxko && CONFIG_TX.daxko.initialBackoffMs) || 500;
+  var maxRetries = Number(CONFIG_TX.daxko && CONFIG_TX.daxko.maxRetries) || 3;
 
   while (true) {
     try {
@@ -204,19 +215,14 @@ function fetchTransactionsPagePost_(body, page) {
       var text = safeGetText_(resp);
 
       if (code >= 200 && code < 300) {
-        var json;
-        try { json = JSON.parse(text); } catch (e) { throw new Error('Invalid JSON on page ' + page + ': ' + e); }
-        // Expect { data: { results: [...] , isCached, cacheDate }, success: true }
-        var data = json && json.data ? json.data : {};
-        var results = (data && data.results && Object.prototype.toString.call(data.results) === '[object Array]') ? data.results : [];
-        var isCached = !!data.isCached;
-        return { payloadText: text, results: results, isCached: isCached };
+        return parseTxResponse_(text, page);
       }
 
       // Auth retry (401/403)
       if (code === 401 || code === 403) {
         try {
           refreshAccessToken_();
+          RUN_FLAGS.didRefresh = true;
           var retry = UrlFetchApp.fetch(CONFIG_TX.daxko.url, {
             method: 'post',
             contentType: 'application/json',
@@ -227,36 +233,51 @@ function fetchTransactionsPagePost_(body, page) {
           var retryCode = retry.getResponseCode();
           var retryText = safeGetText_(retry);
           if (retryCode >= 200 && retryCode < 300) {
-            var j2 = JSON.parse(retryText);
-            var d2 = j2 && j2.data ? j2.data : {};
-            var a2 = (d2 && d2.results && Object.prototype.toString.call(d2.results) === '[object Array]') ? d2.results : [];
-            var isC = !!(d2 && d2.isCached);
-            return { payloadText: retryText, results: a2, isCached: isC };
+            return parseTxResponse_(retryText, page);
           }
-        } catch (e) { /* fall through */ }
+          // Fall through with new code/text to error handling
+          code = retryCode;
+          text = retryText;
+        } catch (e) {
+          // Fall through to retry/backoff below
+        }
       }
 
       // 429/5xx retry with backoff
-      if ((code === 429 || code >= 500) && attempt < CONFIG_TX.daxko.maxRetries) {
+      if ((code === 429 || code >= 500) && attempt < maxRetries) {
         Utilities.sleep(backoff);
         attempt++;
-        backoff = backoff * 2;
+        backoff = Math.min(backoff * 2, 30000); // cap at 30s
         continue;
       }
 
       var snippet = text ? text.substring(0, 500) : '';
-      throw new Error('HTTP ' + code + ': ' + snippet);
+      throw new Error('HTTP ' + code + ' on page ' + page + ': ' + snippet);
 
     } catch (err) {
-      if (attempt < CONFIG_TX.daxko.maxRetries) {
+      if (attempt < maxRetries) {
         Utilities.sleep(backoff);
         attempt++;
-        backoff = backoff * 2;
+        backoff = Math.min(backoff * 2, 30000);
         continue;
       }
       throw err;
     }
   }
+}
+
+/** Single JSON parsing path for both initial and retry responses */
+function parseTxResponse_(text, page) {
+  var json;
+  try {
+    json = JSON.parse(text);
+  } catch (e) {
+    throw new Error('Invalid JSON on page ' + page + ': ' + e);
+  }
+  var data = json && json.data ? json.data : {};
+  var results = Array.isArray(data.results) ? data.results : [];
+  var isCached = !!data.isCached;
+  return { payloadText: text, results: results, isCached: isCached };
 }
 
 // ---- Flattening & casting ----
@@ -315,14 +336,14 @@ function castNum_(v) {
   var n = Number(String(v).replace(/,/g, '').trim());
   return isFinite(n) ? n : '';
 }
-/** Parse 'MM/DD/YYYY HH:MMam' or 'MM/DD/YYYY HH:MMpm' into Date */
+/** Parse 'MM/DD/YYYY HH:MMam' or 'MM/DD/YYYY HH:MM pm' into Date */
 function castTxDate_(s) {
   if (!s) return '';
   var str = String(s).trim();
-  // Example: 01/01/2025 08:48am
-  var m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(am|pm)$/i);
+  // Examples: 01/01/2025 08:48am  |  01/01/2025 08:48 am
+  var m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(am|pm)$/i);
   if (!m) {
-    // Fallback try: Date(...)
+    // Fallback: native Date
     var d = new Date(str);
     return isNaN(d.getTime()) ? '' : d;
   }
@@ -343,26 +364,23 @@ function castTxDate_(s) {
 function saveRawPayloadTx_(payloadText, page) {
   var folder = getOrCreateFolderPath_(CONFIG_TX.raw.driveFolderPath);
   var ts   = new Date().toISOString().replace(/[:.]/g, '-');
-  var base = 'transaction_search_' + ts + '_p' + page + '.json';
-
+  var baseName = 'transaction_search_' + ts + '_p' + page;
   if (CONFIG_TX.raw.gzip) {
-    var blob = Utilities.newBlob(payloadText, 'application/json', base);
-    var gzBlob = Utilities.gzip(blob, base + '.json.gz');
+    var blob  = Utilities.newBlob(payloadText, 'application/json', baseName + '.json');
+    var gzBlob = Utilities.gzip(blob, baseName + '.json.gz'); // keep your existing pattern
     folder.createFile(gzBlob);
   } else {
-    folder.createFile(base, payloadText, MimeType.PLAIN_TEXT);
+    folder.createFile(baseName + '.json', payloadText, MimeType.JSON);
   }
 }
 
-// ---- Resume state for TX ----
+// ---- Resume state for TX (DRY via JSON prop helpers) ----
 
 function getResumeStateTx_() {
-  var s = PropertiesService.getScriptProperties().getProperty(CONFIG_TX.stateKey);
-  if (!s) return null;
-  try { return JSON.parse(s); } catch (_) { return null; }
+  return getJSONProp_(CONFIG_TX.stateKey);
 }
 function setResumeStateTx_(obj) {
-  PropertiesService.getScriptProperties().setProperty(CONFIG_TX.stateKey, JSON.stringify(obj));
+  setJSONProp_(CONFIG_TX.stateKey, obj);
 }
 function resetResumeStateTx_() {
   PropertiesService.getScriptProperties().deleteProperty(CONFIG_TX.stateKey);
@@ -373,8 +391,12 @@ function resetResumeStateTx_() {
 
 function applyHeaderFormatsTx_(sheet) {
   if (!sheet) return;
-  var header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var lastCol = sheet.getLastColumn();
+  if (lastCol === 0) return;
   var rows = Math.max(0, sheet.getMaxRows() - 1);
+  if (rows === 0) return;
+
+  var header = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
   for (var i = 0; i < header.length; i++) {
     var c = i + 1;
     var name = header[i];
@@ -388,8 +410,12 @@ function applyHeaderFormatsTx_(sheet) {
 
 function applyChargeFormatsTx_(sheet) {
   if (!sheet) return;
-  var header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var lastCol = sheet.getLastColumn();
+  if (lastCol === 0) return;
   var rows = Math.max(0, sheet.getMaxRows() - 1);
+  if (rows === 0) return;
+
+  var header = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
   for (var i = 0; i < header.length; i++) {
     var c = i + 1;
     var name = header[i];
@@ -406,37 +432,38 @@ function ensureAuditSheetTx_() {
   var sheet = ss.getSheetByName(CONFIG_TX.audit.sheetName);
   if (!sheet) {
     sheet = ss.insertSheet(CONFIG_TX.audit.sheetName);
-    sheet.appendRow([
+    var header = [
       'RunTimestamp','Status','StartPage','LastNonEmptyPage','PagesFetched','RecordsFetched',
       'Appended','Updated','RawFilesSaved','DurationMs','ResumeSavedPage','Format','PageSize','Error',
       'Refreshed','ParseMode','CSVSanitized'
-    ]);
+    ];
+    sheet.appendRow(header);
     sheet.setFrozenRows(1);
-    sheet.getRange(1,1,1,17).setFontWeight('bold');
+    sheet.getRange(1,1,1,header.length).setFontWeight('bold');
+    // Optional: apply timestamp format
+    sheet.getRange('A:A').setNumberFormat('yyyy-MM-dd HH:mm:ss');
   }
   return sheet;
 }
 
 function writeAuditLogTx_(info) {
   var sheet = ensureAuditSheetTx_();
+  // Maintain same order as header
   sheet.appendRow([
-    info.runTimestamp,
-    info.status,
+    info.runTimestamp || new Date(),
+    info.status || 'UNKNOWN',
     info.startPage || '',
     info.lastNonEmptyPage || '',
     info.pagesFetched || 0,
     info.recordsFetched || 0,
-    info.appended || 0,         // header added
-    info.updated || 0,          // header updated
+    info.appended || 0,
+    info.updated || 0,
     info.rawFilesSaved || 0,
     info.durationMs || 0,
     info.resumeSavedPage || '',
     info.format || 'json',
     info.pageSize || '',
-    // include charge stats in the error column if success, so you can see it in the grid
-    (info.error ? info.error :
-      ('charges: +' + (info.txChargeAppended||0) + ', ~' + (info.txChargeUpdated||0))
-    ),
+    info.error || '',
     info.refreshed || 'no',
     info.parseMode || 'json',
     info.csvSanitized || 'no'

@@ -1,0 +1,22 @@
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="arrowGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e8e3e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#185abc;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="100" height="100" fill="#ffffff"/>
+
+  <!-- Grid representing the sheet -->
+  <g id="grid" fill="none" stroke="#a9d6b8" stroke-width="2">
+    <path d="M30 20 V80 M50 20 V80 M70 20 V80 M15 40 H85 M15 60 H85" />
+  </g>
+
+  <!-- Arrow representing data flow -->
+  <g id="arrow" transform="translate(20, 15) rotate(20)">
+      <path d="M10,15 C20,5 40,5 50,15 L50,25 C40,15 20,15 10,25 Z" fill="#34A853"/>
+      <polygon points="48,15 60,15 54,25" fill="#188038"/>
+  </g>
+</svg>

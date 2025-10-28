@@ -2,33 +2,48 @@
  * Raw payload storage (Drive).
  */
 
+/**
+ * Saves a raw payload to Drive, optionally gzipped.
+ */
 function saveRawPayload_(payloadText, pageNumber) {
-  var folder = getOrCreateFolderPath_(CONFIG.raw.driveFolderPath);
-  var ts   = new Date().toISOString().replace(/[:.]/g, '-');
-  var ext  = String(CONFIG.request.format || 'json').toLowerCase(); // 'json' | 'csv'
-  var base = 'report1_' + ts + '_p' + pageNumber + '.' + ext;
+  saveRawPayloadForConfig_(CONFIG, payloadText, pageNumber);
+}
 
-  if (CONFIG.raw.gzip) {
+/**
+ * Generic raw payload saver for any config.
+ */
+function saveRawPayloadForConfig_(config, payloadText, pageNumber) {
+  var folder = getOrCreateFolderPath_(config.raw.driveFolderPath);
+  var timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  var ext = String(config.request.format || 'json').toLowerCase(); // 'json' | 'csv'
+  var filename = `report_${timestamp}_p${pageNumber}.${ext}`;
+
+  if (config.raw.gzip) {
     var mime = ext === 'json' ? 'application/json' : 'text/csv';
-    var blob = Utilities.newBlob(payloadText, mime, base);
-    var gzBlob = Utilities.gzip(blob, base + '.gz'); // gzip expects Blob/BlobSource
+    var blob = Utilities.newBlob(payloadText, mime, filename);
+    var gzBlob = Utilities.gzip(blob, filename + '.gz');
     folder.createFile(gzBlob);
   } else {
-    folder.createFile(base, payloadText, MimeType.PLAIN_TEXT);
+    folder.createFile(filename, payloadText, MimeType.PLAIN_TEXT);
   }
 }
 
+/**
+ * Cleans up old raw files in a folder by retention age.
+ */
 function cleanupOldRawFiles_(folderPath, retentionDays) {
   var folder = getOrCreateFolderPath_(folderPath);
   var cutoff = Date.now() - retentionDays * 24 * 3600 * 1000;
   var files = folder.getFiles();
   var trashed = 0;
+
   while (files.hasNext()) {
-    var f = files.next();
-    if (f.getDateCreated().getTime() < cutoff) {
-      f.setTrashed(true);
+    var file = files.next();
+    if (file.getDateCreated().getTime() < cutoff) {
+      file.setTrashed(true);
       trashed++;
     }
   }
-  if (trashed) Logger.log('Cleanup: moved ' + trashed + ' raw files to trash.');
+
+  if (trashed) Logger.log(`Cleanup: moved ${trashed} raw files to trash.`);
 }
