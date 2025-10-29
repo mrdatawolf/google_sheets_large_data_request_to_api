@@ -43,6 +43,7 @@ The project is organized into several `.gs` files, each responsible for a specif
 *   `main.gs`: Main entry points for running and setting up reports.
 *   `reportRunner.gs`: The core engine for running a report based on a configuration.
 *   `config.gs`: Contains the configuration objects for different reports (e.g., `CONFIG`, `CONFIG_TX`).
+*   `configHelper.gs`: Provides helper functions to simplify the creation of configuration objects.
 *   `fetch.gs`: Handles the low-level details of making API requests, including authentication and retries.
 *   `sheet.gs`: Provides functions for interacting with Google Sheets (e.g., creating sheets, upserting data).
 *   `auth.gs`: Manages OAuth 2.0 authentication and token handling.

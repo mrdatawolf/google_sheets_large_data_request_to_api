@@ -93,9 +93,9 @@ function testRunReport_CONFIG_TEST_basic() {
     return { appended: (records ? records.length : 0), updated: 0 };
   };
 
-  applyColumnFormats_ = function(sheet) { /* no-op */ };
-
   try {
+    // Ensure a clean state for the test
+    PropertiesService.getScriptProperties().deleteProperty('TestSheet');
     // Clone CONFIG_TEST shallowly and override only what we need for this test
     var cfg = {};
     for (var k in CONFIG_TEST) if (Object.prototype.hasOwnProperty.call(CONFIG_TEST, k)) cfg[k] = CONFIG_TEST[k];
