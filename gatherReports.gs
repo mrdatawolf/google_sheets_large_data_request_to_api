@@ -13,3 +13,11 @@ function runTransactionsReport() {
 function setupTransactions() {
   setupReport(CONFIG_TX, 'runTransactionsReport',24);
 }
+
+function runUserGroupDynamicReport() {
+  runReport(CONFIG_UGDR);
+}
+
+function setupUserGroupDynamicReport() {
+  setupReport(CONFIG_UGDR, 'runUserGroupDynamicReport', 24);
+}

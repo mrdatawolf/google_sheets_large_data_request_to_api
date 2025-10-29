@@ -64,7 +64,8 @@ var CONFIG_TX = (function () {
   var apiUrl = 'https://api.partners.daxko.com/api/v1/reports/transaction-search';
 
   var outputFields = [
-    'uniqueID', 'invoice', 'date', 'memberName', 'total'
+    'uniqueID', 'invoice', 'date', 'memberName', 'total',
+
   ];
 
   return ck_makeConfig_({
@@ -81,5 +82,57 @@ var CONFIG_TX = (function () {
     buildBody: buildTxBody_,
     flatten: flattenTxInvoices_,
     fetchPage: fetchTxPage_
+  });
+})();
+
+var CONFIG_UGDR = (function () {
+  var sheetDetails = 'UserGDR_Details';
+  var sheetSummary = 'UserGDR_Summary';
+
+  // Since the API doesn't support filtering, we define the fields here
+  // to control what appears in the sheet.
+  var detailFields = [
+    'User Group', 'User Group Billing Type', 'Start Total', 'End Total', 'Net', 'New',
+    'Canceled', 'Inactive', 'Expired', 'Changed To', 'Changed From', 'On Hold',
+    'Off Hold', 'Reactivate', 'Renewed'
+  ];
+
+  // This report is unique; it doesn't use a paginated API, so we override fetchPage
+  // to ensure it only runs once.
+  function fetchUgdrOnce_(body, page, ctx) {
+    if (page > 1) return { records: [] }; // Only fetch page 1
+    var raw = fetchDaxkoPagePost_(body, page, ctx || this);
+    var obj = ck_asObject_(raw);
+    return { records: [obj] }; // Return the single object to be flattened
+  }
+
+  var sheetConfigs = [
+    {
+      sheetName: sheetSummary,
+      fields: ['Metric', 'Value'],
+      keyField: 'Metric',
+      getRecords: function (flattened) { return flattened.summary; }
+    },
+    {
+      sheetName: sheetDetails,
+      fields: detailFields,
+      keyField: 'User Group',
+      getRecords: function (flattened) { return flattened.details; }
+    }
+  ];
+
+  return ck_makeConfig_({
+    sheetName: sheetSummary, // Primary sheet for state (though not paginated)
+    uniqueKey: 'Metric',
+    apiUrl: 'https://api.partners.daxko.com/api/v1/reports/22',
+    outputFields: [], // Not used by API, but defined for consistency
+
+    defaults: { pageSize: 1, startPage: 1, format: 'json' }, // Not paginated
+    scheduleDaily: true,
+    auditSheetName: 'daxko_audit',
+
+    flatten: flattenUgdr_,
+    fetchPage: fetchUgdrOnce_,
+    sheetConfigs: sheetConfigs
   });
 })();
