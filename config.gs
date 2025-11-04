@@ -3,7 +3,7 @@ var CONFIG_TEST = (function () {
   var uniqueKey = 'SystemId';
   var outputFields = ['SystemId', 'Name', 'Email'];
 
-  return ck_createConfig_({
+  return ck_makeConfig_({
     sheetName: sheetName,
     uniqueKey: uniqueKey,
     apiUrl: 'https://mock.api/test',
@@ -37,7 +37,7 @@ var CONFIG = (function () {
   ];
   var criteriaFields = {}; // empty object
 
-  return ck_createConfig_({
+  return ck_makeConfig_({
     sheetName: sheetName,
     uniqueKey: uniqueKey,
     apiUrl: 'https://api.partners.daxko.com/api/v1/reports/1',
@@ -64,8 +64,7 @@ var CONFIG_TX = (function () {
   var apiUrl = 'https://api.partners.daxko.com/api/v1/reports/transaction-search';
 
   var outputFields = [
-    'uniqueID', 'invoice', 'date', 'memberName', 'total',
-
+    'uniqueID', 'invoice', 'date', 'memberName', 'total'
   ];
 
   return ck_makeConfig_({
@@ -89,22 +88,11 @@ var CONFIG_UGDR = (function () {
   var sheetDetails = 'UserGDR_Details';
   var sheetSummary = 'UserGDR_Summary';
 
-  // Since the API doesn't support filtering, we define the fields here
-  // to control what appears in the sheet.
   var detailFields = [
     'User Group', 'User Group Billing Type', 'Start Total', 'End Total', 'Net', 'New',
     'Canceled', 'Inactive', 'Expired', 'Changed To', 'Changed From', 'On Hold',
     'Off Hold', 'Reactivate', 'Renewed'
   ];
-
-  // This report is unique; it doesn't use a paginated API, so we override fetchPage
-  // to ensure it only runs once.
-  function fetchUgdrOnce_(body, page, ctx) {
-    if (page > 1) return { records: [] }; // Only fetch page 1
-    var raw = fetchDaxkoPagePost_(body, page, ctx || this);
-    var obj = ck_asObject_(raw);
-    return { records: [obj] }; // Return the single object to be flattened
-  }
 
   var sheetConfigs = [
     {
@@ -122,15 +110,17 @@ var CONFIG_UGDR = (function () {
   ];
 
   return ck_makeConfig_({
-    sheetName: sheetSummary, // Primary sheet for state (though not paginated)
+    sheetName: sheetSummary, // Primary sheet for state
     uniqueKey: 'Metric',
     apiUrl: 'https://api.partners.daxko.com/api/v1/reports/22',
-    outputFields: [], // Not used by API, but defined for consistency
-
-    defaults: { pageSize: 1, startPage: 1, format: 'json' }, // Not paginated
+    outputFields: [], // Not used by API
     scheduleDaily: true,
     auditSheetName: 'daxko_audit',
 
+    // This API is not paginated and takes no parameters
+    buildBody: function() { return {}; },
+
+    // Custom functions are in userGroupDynamicReport.gs
     flatten: flattenUgdr_,
     fetchPage: fetchUgdrOnce_,
     sheetConfigs: sheetConfigs
