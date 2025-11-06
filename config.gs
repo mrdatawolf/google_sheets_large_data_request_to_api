@@ -84,45 +84,23 @@ var CONFIG_TX = (function () {
   });
 })();
 
-var CONFIG_UGDR = (function () {
-  var sheetDetails = 'UserGDR_Details';
-  var sheetSummary = 'UserGDR_Summary';
-
-  var detailFields = [
-    'User Group', 'User Group Billing Type', 'Start Total', 'End Total', 'Net', 'New',
-    'Canceled', 'Inactive', 'Expired', 'Changed To', 'Changed From', 'On Hold',
-    'Off Hold', 'Reactivate', 'Renewed'
-  ];
-
-  var sheetConfigs = [
-    {
-      sheetName: sheetSummary,
-      fields: ['Metric', 'Value'],
-      keyField: 'Metric',
-      getRecords: function (flattened) { return flattened.summary; }
-    },
-    {
-      sheetName: sheetDetails,
-      fields: detailFields,
-      keyField: 'User Group',
-      getRecords: function (flattened) { return flattened.details; }
-    }
-  ];
-
-  return ck_makeConfig_({
-    sheetName: sheetSummary, // Primary sheet for state
-    uniqueKey: 'Metric',
-    apiUrl: 'https://api.partners.daxko.com/api/v1/reports/22',
-    outputFields: [], // Not used by API
-    scheduleDaily: true,
-    auditSheetName: 'daxko_audit',
-
-    // This API is not paginated and takes no parameters
-    buildBody: function() { return {}; },
+var CONFIG_UGDR = {
+  apiUrl: 'https://api.partners.daxko.com/api/v1/reports/22',
+  audit: {
+    sheetName: 'daxko_audit',
+    writeLog: function (info) { appendAuditRow_(info, 'daxko_audit'); }
+  },
+  buildBody: function() {
+    return {
+      "format": "json",
+      "pageSize": "50",
+      "pageNumber": "1",
+      "criteriaFields": {}
+    };
+  },
 
     // Custom functions are in userGroupDynamicReport.gs
     flatten: flattenUgdr_,
-    fetchPage: fetchUgdrOnce_,
-    sheetConfigs: sheetConfigs
+    fetchPage: fetchUgdrOnce_
   });
-})();
+};
