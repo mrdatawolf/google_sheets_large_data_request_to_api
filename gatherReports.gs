@@ -21,3 +21,11 @@ function runUserGroupDynamicReport() {
 function setupUserGroupDynamicReport() {
   setupReport(CONFIG_UGDR, 'runUserGroupDynamicReport', 24);
 }
+
+function runUserGroupStatisticsReport() {
+  runReport(CONFIG_UGSR);
+}
+
+function setupUserGroupStatisticsReport() {
+  setupReport(CONFIG_UGSR, 'runUserGroupStatisticsReport', 24);
+}

@@ -86,21 +86,80 @@ var CONFIG_TX = (function () {
 
 var CONFIG_UGDR = {
   apiUrl: 'https://api.partners.daxko.com/api/v1/reports/22',
+  pageSize: 50,
+  format: 'json',
+  daxko: {
+    initialBackoffMs: 1000,
+    maxRetries: 3
+  },
+  runtime: {
+    msBudget: 240000
+  },
   audit: {
     sheetName: 'daxko_audit',
     writeLog: function (info) { appendAuditRow_(info, 'daxko_audit'); }
   },
-  buildBody: function() {
+  buildRequestBody: function(page) {
     return {
       "format": "json",
       "pageSize": "50",
-      "pageNumber": "1",
+      "pageNumber": String(page || 1),
       "criteriaFields": {}
     };
   },
 
-    // Custom functions are in userGroupDynamicReport.gs
-    flatten: flattenUgdr_,
-    fetchPage: fetchUgdrOnce_
-  });
+  // Dummy sheetConfigs to satisfy validation (actual sheets are defined in flattenUgdr_)
+  sheetConfigs: [
+    {
+      sheetName: 'UserGDR_Summary',
+      fields: ['Metric', 'Value'],
+      keyField: 'Metric'
+    }
+  ],
+
+  // Custom functions are in userGroupDynamicReport.gs
+  flattenRecords: flattenUgdr_,
+  fetchPage: function(body, page, ctx) {
+    return fetchUgdrOnce_(body, page, ctx || this);
+  }
+};
+
+var CONFIG_UGSR = {
+  apiUrl: 'https://api.partners.daxko.com/api/v1/reports/26',
+  pageSize: 50,
+  format: 'json',
+  daxko: {
+    initialBackoffMs: 1000,
+    maxRetries: 3
+  },
+  runtime: {
+    msBudget: 240000
+  },
+  audit: {
+    sheetName: 'daxko_audit',
+    writeLog: function (info) { appendAuditRow_(info, 'daxko_audit'); }
+  },
+  buildRequestBody: function(page) {
+    return {
+      "format": "json",
+      "pageSize": "50",
+      "pageNumber": String(page || 1),
+      "criteriaFields": {}
+    };
+  },
+
+  // Dummy sheetConfigs to satisfy validation (actual sheets are defined in flattenUgsr_)
+  sheetConfigs: [
+    {
+      sheetName: 'UserGSR_Summary',
+      fields: ['Metric', 'Value'],
+      keyField: 'Metric'
+    }
+  ],
+
+  // Custom functions are in userGroupStatisticsReport.gs
+  flattenRecords: flattenUgsr_,
+  fetchPage: function(body, page, ctx) {
+    return fetchUgsrOnce_(body, page, ctx || this);
+  }
 };

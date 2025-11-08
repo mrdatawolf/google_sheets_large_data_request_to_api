@@ -1,16 +1,16 @@
 /**
- * Contains all logic for the User Group Dynamic Report (CONFIG_UGDR).
+ * Contains all logic for the User Group Statistics Report (CONFIG_UGSR).
  */
 
 /**
- * Fetches the User Group Dynamic Report data.
+ * Fetches the User Group Statistics Report data.
  * This report is not paginated, so we only fetch page 1.
  * @param {Object} body - The request body
  * @param {number} page - The page number (only page 1 is fetched)
  * @param {Object} ctx - The context object containing apiUrl and other config
  * @returns {Object} Object with records array containing the parsed response
  */
-function fetchUgdrOnce_(body, page, ctx) {
+function fetchUgsrOnce_(body, page, ctx) {
   if (page > 1) return { records: [] }; // Ensure we only run once
 
   // Call the low-level fetcher to get the raw text response
@@ -22,11 +22,12 @@ function fetchUgdrOnce_(body, page, ctx) {
 }
 
 /**
- * The main runner function for the User Group Dynamic Report.
- * This report has a unique data structure and is not paginated, so it uses this
- * dedicated runner instead of the generic runReport function.
+ * Flattens the User Group Statistics Report data into two sheets:
+ * one for summary totals and one for detailed results.
+ * @param {Array} resultsArr - Array containing the raw API response
+ * @returns {Array} Array of job objects for the runner to process
  */
-function flattenUgdr_(resultsArr) {
+function flattenUgsr_(resultsArr) {
   var rawApiObject = resultsArr[0] || {};
   var data = rawApiObject.data || {};
   var totals = data.totals || {};
@@ -42,20 +43,19 @@ function flattenUgdr_(resultsArr) {
 
   // Define the two jobs
   var summaryJob = {
-    sheetName: 'UserGDR_Summary',
+    sheetName: 'UserGSR_Summary',
     records: summaryRecords,
     keyField: 'Metric',
     fields: ['Metric', 'Value']
   };
 
   var detailsJob = {
-    sheetName: 'UserGDR_Details',
+    sheetName: 'UserGSR_Details',
     records: details,
     keyField: 'User Group',
     fields: [
-      'User Group', 'User Group Billing Type', 'Start Total', 'End Total', 'Net', 'New',
-      'Canceled', 'Inactive', 'Expired', 'Changed To', 'Changed From', 'On Hold',
-      'Off Hold', 'Reactivate', 'Renewed'
+      'User Group', 'User Group Billing Type', 'Total', 'Active', 'Canceled',
+      'Inactive', 'Expired', 'On Hold', 'Online Review'
     ]
   };
 
