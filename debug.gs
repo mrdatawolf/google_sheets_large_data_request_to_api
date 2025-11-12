@@ -37,6 +37,38 @@ function DebugAuthOnce() {
   }
 }
 
+/**
+ * Debug function to check/refresh token and display it for copy/paste.
+ * This will automatically reauthenticate if the token is expired.
+ * View the token in Execution log (Ctrl+Enter or View > Logs).
+ */
+function DebugGetToken() {
+  try {
+    // This call automatically checks expiration and reauthenticates if needed
+    var token = getAccessToken_();
+    var expAt = getProp_('DAXKO_ACCESS_EXPIRES_AT');
+    var expiresDate = expAt ? new Date(Number(expAt)) : null;
+
+    // Log to Logger for easy copy/paste
+    Logger.log('========================================');
+    Logger.log('ACCESS TOKEN (copy from below):');
+    Logger.log('========================================');
+    Logger.log(token);
+    Logger.log('========================================');
+    if (expiresDate) {
+      Logger.log('Expires at: ' + expiresDate.toLocaleString());
+    }
+    Logger.log('========================================');
+
+    return token;
+  } catch (e) {
+    Logger.log('========================================');
+    Logger.log('ERROR getting token: ' + e);
+    Logger.log('========================================');
+    throw e;
+  }
+}
+
 /** Simple gzip sanity test (Drive access required). */
 function _testGzipOnce() {
   var folder = getOrCreateFolderPath_('daxko-raw/_tests');

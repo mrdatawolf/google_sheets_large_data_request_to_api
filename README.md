@@ -93,6 +93,7 @@ utils.gs             → Helper functions
 - `transactions.gs` - Custom logic for transactions report
 - `userGroupDynamicReport.gs` - User group dynamic report
 - `userGroupStatisticsReport.gs` - User group statistics report
+- `accountingAgingReport.gs` - Accounting aging report with statement period management
 
 ## How It Works
 
@@ -228,6 +229,41 @@ setupAll()
 ```
 
 This creates time-based triggers for all configured reports. View triggers in **Apps Script > Triggers**.
+
+### Running the Accounting Aging Report
+
+The Accounting Aging Report (`CONFIG_AGING`) has special features for managing the statement period:
+
+#### Run Manually (Default - Previous Month)
+```javascript
+// Runs with automatic previous month period (e.g., if today is 2025-11-11, uses 2025-10)
+runAccountingAgingReport()
+```
+
+#### Set Custom Statement Period
+```javascript
+// Set a specific statement period
+setStatementPeriod_("2025-06")
+
+// Now run the report with the custom period
+runAccountingAgingReport()
+
+// Clear the custom period to return to automatic mode
+clearStatementPeriod_()
+```
+
+#### Set Up Daily Automation
+```javascript
+// Creates daily trigger using automatic previous month
+setupAccountingAgingReport()
+```
+
+**Note:** The report will be imported to a sheet named "AccountingAging" with these fields:
+- SystemId
+- LastLogin
+- HomeClub
+- UserGroupName
+- Field "4" (numeric aging data)
 
 ## Configuration
 
@@ -437,6 +473,51 @@ var state = getResumeState_('Users');
 Logger.log(JSON.stringify(state));
 ```
 
+### Debug Functions
+
+Several debug functions are available in `debug.gs` to help troubleshoot and inspect the system:
+
+#### Get Access Token for Testing
+
+If you need to manually inspect or copy the current access token (e.g., for API testing in Postman or curl):
+
+```javascript
+// In Apps Script editor, run:
+DebugGetToken()
+```
+
+This function will:
+- Automatically check if the token is expired and refresh it if needed
+- Display the token in the execution log with clear formatting
+- Show the token's expiration time
+- Handle any authentication errors
+
+**To view the output:**
+1. Run the function from the Apps Script editor
+2. View the execution log (Ctrl+Enter or View > Logs)
+3. Copy the token from between the separator lines
+
+**Example output:**
+```
+========================================
+ACCESS TOKEN (copy from below):
+========================================
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+========================================
+Expires at: 11/11/2025, 5:30:00 PM
+========================================
+```
+
+#### Other Debug Functions
+
+```javascript
+// Check which credentials are configured
+DebugTokens()
+
+// Test authentication with a single API call
+DebugAuthOnce()
+```
+
 ## Project Structure
 
 ### Core Modules
@@ -460,6 +541,7 @@ Logger.log(JSON.stringify(state));
 - `CONFIG_TX` - Transactions report configuration
 - `CONFIG_UGDR` - User group dynamic report
 - `CONFIG_UGSR` - User group statistics report
+- `CONFIG_AGING` - Accounting aging report (with statement period support)
 - `CONFIG_TEST` - Test configuration (for unit tests)
 
 #### `configHelper.gs` - Configuration Factory
@@ -513,14 +595,31 @@ Logger.log(JSON.stringify(state));
 - `fetchUgsrOnce_(body, page, ctx)` - Fetch user group statistics report
 - `flattenUgsr_(arr)` - Transform UGSR data
 
+#### `accountingAgingReport.gs`
+- `getStatementPeriod_()` - Get current or custom statement period (YYYY-MM format)
+- `getCurrentStatementPeriod_()` - Get previous month's period automatically
+- `setStatementPeriod_(period)` - Set custom statement period override
+- `clearStatementPeriod_()` - Clear custom period override
+
 ### Support Modules
 
 #### `tests.gs` - Test Suite
 - Unit tests for core functionality
-- Run with `runAllTests()`
+- Run with `runAllTests()` or individual test suites:
+  - `runStateTests()` - State management
+  - `runSheetTests()` - Sheet operations
+  - `runUtilsTests()` - Utility functions
+  - `runConfigTests()` - Configuration validation
+  - `runAuthTests()` - Authentication
+  - `runFetchTests()` - HTTP and parsing
+  - `runReportRunnerTests()` - Report runner logic
+  - `runAgingTests()` - Accounting aging report
+- Quick test shortcuts: `quickTestState()`, `quickTestSheet()`, `quickTestUtils()`, `quickTestConfig()`, `quickTestAging()`
 
 #### `debug.gs` - Development Tools
-- Helper functions for debugging and development
+- `DebugGetToken()` - Get and display current access token (with auto-refresh)
+- `DebugTokens()` - Check which credentials are configured
+- `DebugAuthOnce()` - Test authentication with a single API call
 
 #### `notifications.gs` - Email Notifications
 - Send digest emails after execution

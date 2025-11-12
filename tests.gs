@@ -13,6 +13,7 @@
  *   - runAuthTests()          → Test authentication
  *   - runFetchTests()         → Test HTTP and parsing
  *   - runReportRunnerTests()  → Test report runner logic
+ *   - runAgingTests()         → Test accounting aging report
  */
 
 // ==============================================================================
@@ -36,6 +37,7 @@ function runAllTests() {
   runAuthTests();
   runFetchTests();
   runReportRunnerTests();
+  runAgingTests();
 
   _printTestSummary_();
 }
@@ -127,6 +129,23 @@ function runReportRunnerTests() {
   _runSingleTest_(testRunReport_multiSheetJobs, 'testRunReport_multiSheetJobs');
   _runSingleTest_(testPagination_emptyFirstPage, 'testPagination_emptyFirstPage');
   _runSingleTest_(testPagination_partialLastPage, 'testPagination_partialLastPage');
+}
+
+/**
+ * Run accounting aging report tests
+ */
+function runAgingTests() {
+  Logger.log('\n--- Accounting Aging Report Tests ---');
+  _runSingleTest_(testAgingReport_getCurrentStatementPeriod, 'testAgingReport_getCurrentStatementPeriod');
+  _runSingleTest_(testAgingReport_getCurrentStatementPeriod_january, 'testAgingReport_getCurrentStatementPeriod_january');
+  _runSingleTest_(testAgingReport_setCustomStatementPeriod, 'testAgingReport_setCustomStatementPeriod');
+  _runSingleTest_(testAgingReport_clearStatementPeriod, 'testAgingReport_clearStatementPeriod');
+  _runSingleTest_(testAgingReport_getStatementPeriod_noOverride, 'testAgingReport_getStatementPeriod_noOverride');
+  _runSingleTest_(testAgingReport_setStatementPeriod_formats, 'testAgingReport_setStatementPeriod_formats');
+  _runSingleTest_(testAgingReport_configBuildBody, 'testAgingReport_configBuildBody');
+  _runSingleTest_(testAgingReport_configBuildBody_customPeriod, 'testAgingReport_configBuildBody_customPeriod');
+  _runSingleTest_(testAgingReport_configStructure, 'testAgingReport_configStructure');
+  _runSingleTest_(testAgingReport_configBuildBody_pagination, 'testAgingReport_configBuildBody_pagination');
 }
 
 // ==============================================================================
@@ -393,5 +412,14 @@ function quickTestUtils() {
 function quickTestConfig() {
   _resetTestResults_();
   runConfigTests();
+  _printTestSummary_();
+}
+
+/**
+ * Quick test - just run aging report tests
+ */
+function quickTestAging() {
+  _resetTestResults_();
+  runAgingTests();
   _printTestSummary_();
 }

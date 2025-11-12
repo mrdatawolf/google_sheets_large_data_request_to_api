@@ -29,3 +29,11 @@ function runUserGroupStatisticsReport() {
 function setupUserGroupStatisticsReport() {
   setupReport(CONFIG_UGSR, 'runUserGroupStatisticsReport', 24);
 }
+
+function runAccountingAgingReport() {
+  runReport(CONFIG_AGING);
+}
+
+function setupAccountingAgingReport() {
+  setupReport(CONFIG_AGING, 'runAccountingAgingReport', 24);
+}

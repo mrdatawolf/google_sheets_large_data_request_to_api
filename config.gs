@@ -163,3 +163,58 @@ var CONFIG_UGSR = {
     return fetchUgsrOnce_(body, page, ctx || this);
   }
 };
+
+var CONFIG_AGING = (function () {
+  var sheetName = 'AccountingAging';
+  var uniqueKey = 'SystemId';
+  var outputFields = [
+    'SystemId',
+    'LastLogin',
+    'HomeClub',
+    'UserGroupName',
+    '4'  // Numeric field from aging report
+  ];
+
+  return ck_makeConfig_({
+    sheetName: sheetName,
+    uniqueKey: uniqueKey,
+    apiUrl: 'https://api.partners.daxko.com/api/v1/reports/22',
+    outputFields: outputFields,
+    criteriaFields: {
+      aging: {
+        statement_period: getStatementPeriod_(),  // e.g., "2025-06" (with custom override support)
+        combined: "individual",
+        transaction_type: "0"
+      }
+    },
+
+    defaults: { pageSize: 50, startPage: 1, format: 'json' },
+    scheduleDaily: true,
+    auditSheetName: 'daxko_audit',
+
+    // Custom buildBody to include aging criteriaFields
+    buildBody: function(page) {
+      return {
+        "format": "json",
+        "pageSize": "50",
+        "pageNumber": String(page || 1),
+        "outputFields": outputFields,  // Use closure variable
+        "criteriaFields": {
+          "aging": {
+            "statement_period": getStatementPeriod_(),
+            "combined": "individual",
+            "transaction_type": "0"
+          }
+        }
+      };
+    },
+
+    // Standard fetch delegates to shared fetcher
+    fetchPage: function (body, page, ctx) {
+      return fetchDaxkoPagePost_(body, page, ctx || this);
+    },
+
+    // Pass-through: runner/parse handles the data.results structure
+    flatten: function (resultsArr) { return { main: resultsArr }; }
+  });
+})();
