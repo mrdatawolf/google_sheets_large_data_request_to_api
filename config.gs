@@ -33,7 +33,7 @@ var CONFIG = (function () {
     'SystemId','FirstName','LastName','Email','Age','ParentId','Gender',
     'BirthDate','Joined','Status','GuestVisits','DependentCount','Employer',
     'LastCheckInDate','MemberSince','MemberName','EftPaymentMethod','HomeClub',
-    'UBATitle','UbaBankName','UCCType'
+    'UBATitle','UbaBankName','UCCType','dateCancelOn'
   ];
   var criteriaFields = {}; // empty object
 
@@ -178,27 +178,30 @@ var CONFIG_AGING = (function () {
   return ck_makeConfig_({
     sheetName: sheetName,
     uniqueKey: uniqueKey,
-    apiUrl: 'https://api.partners.daxko.com/api/v1/reports/22',
+    apiUrl: 'https://api.partners.daxko.com/api/v1/reports/5',
     outputFields: outputFields,
-    criteriaFields: {
-      aging: {
-        statement_period: getStatementPeriod_(),  // e.g., "2025-06" (with custom override support)
-        combined: "individual",
-        transaction_type: "0"
-      }
-    },
+    criteriaFields: {},  // Populated dynamically in buildBody
 
     defaults: { pageSize: 50, startPage: 1, format: 'json' },
     scheduleDaily: true,
     auditSheetName: 'daxko_audit',
 
     // Custom buildBody to include aging criteriaFields
-    buildBody: function(page) {
+    buildBody: function(page, ctx) {
+      // Get outputFields from closure or from context
+      var fields = outputFields;
+      if (!fields && ctx && ctx.request && ctx.request.outputFields) {
+        fields = ctx.request.outputFields;
+      }
+      if (!fields) {
+        fields = ['SystemId', 'LastLogin', 'HomeClub', 'UserGroupName', '4'];
+      }
+
       return {
         "format": "json",
         "pageSize": "50",
         "pageNumber": String(page || 1),
-        "outputFields": outputFields,  // Use closure variable
+        "outputFields": fields,
         "criteriaFields": {
           "aging": {
             "statement_period": getStatementPeriod_(),

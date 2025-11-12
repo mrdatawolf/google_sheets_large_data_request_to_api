@@ -38,6 +38,59 @@ function DebugAuthOnce() {
 }
 
 /**
+ * Debug function to inspect the CONFIG_AGING configuration structure
+ */
+function DebugAgingConfig() {
+  Logger.log('=== Testing CONFIG_AGING structure ===');
+
+  if (typeof CONFIG_AGING === 'undefined') {
+    Logger.log('ERROR: CONFIG_AGING is undefined!');
+    return;
+  }
+
+  Logger.log('CONFIG_AGING exists: true');
+  Logger.log('sheetName: ' + CONFIG_AGING.sheetName);
+  Logger.log('uniqueKey: ' + CONFIG_AGING.uniqueKey);
+  Logger.log('apiUrl: ' + CONFIG_AGING.apiUrl);
+
+  Logger.log('Has request object: ' + (CONFIG_AGING.request != null));
+  if (CONFIG_AGING.request) {
+    Logger.log('request.format: ' + CONFIG_AGING.request.format);
+    Logger.log('request.pageSize: ' + CONFIG_AGING.request.pageSize);
+    Logger.log('request.outputFields exists: ' + (CONFIG_AGING.request.outputFields != null));
+    if (CONFIG_AGING.request.outputFields) {
+      Logger.log('request.outputFields: ' + JSON.stringify(CONFIG_AGING.request.outputFields));
+    }
+  }
+
+  Logger.log('Has sheetConfigs: ' + (CONFIG_AGING.sheetConfigs != null));
+  if (CONFIG_AGING.sheetConfigs) {
+    Logger.log('sheetConfigs length: ' + CONFIG_AGING.sheetConfigs.length);
+    for (var i = 0; i < CONFIG_AGING.sheetConfigs.length; i++) {
+      var sc = CONFIG_AGING.sheetConfigs[i];
+      Logger.log('sheetConfig[' + i + '] sheetName: ' + sc.sheetName);
+      Logger.log('sheetConfig[' + i + '] keyField: ' + sc.keyField);
+      Logger.log('sheetConfig[' + i + '] fields exists: ' + (sc.fields != null));
+      if (sc.fields) {
+        Logger.log('sheetConfig[' + i + '] fields: ' + JSON.stringify(sc.fields));
+      }
+    }
+  }
+
+  Logger.log('Has buildRequestBody: ' + (typeof CONFIG_AGING.buildRequestBody === 'function'));
+  if (typeof CONFIG_AGING.buildRequestBody === 'function') {
+    try {
+      var testBody = CONFIG_AGING.buildRequestBody(1);
+      Logger.log('buildRequestBody(1) result: ' + JSON.stringify(testBody, null, 2));
+    } catch (e) {
+      Logger.log('ERROR calling buildRequestBody: ' + e);
+    }
+  }
+
+  Logger.log('=== Test complete ===');
+}
+
+/**
  * Debug function to check/refresh token and display it for copy/paste.
  * This will automatically reauthenticate if the token is expired.
  * View the token in Execution log (Ctrl+Enter or View > Logs).

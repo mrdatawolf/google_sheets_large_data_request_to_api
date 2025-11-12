@@ -313,7 +313,7 @@ function testAgingReport_configStructure() {
 
   // Check basic config properties
   assertEquals_('apiUrl should be correct',
-    'https://api.partners.daxko.com/api/v1/reports/22', CONFIG_AGING.apiUrl);
+    'https://api.partners.daxko.com/api/v1/reports5', CONFIG_AGING.apiUrl);
   assertEquals_('pageSize should be 50', 50, CONFIG_AGING.pageSize);
   assertEquals_('format should be json', 'json', CONFIG_AGING.format);
 
