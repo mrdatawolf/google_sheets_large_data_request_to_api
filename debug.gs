@@ -130,3 +130,36 @@ function _testGzipOnce() {
   folder.createFile(gz);
   Logger.log('Created test file: hello.txt.gz');
 }
+
+/**
+ * Debug function for Dues Summary Report.
+ * Shows the current state and what will be fetched next.
+ */
+function DebugDuesSummary() {
+  Logger.log('=== Dues Summary Debug ===');
+
+  var lastMonth = getLastDuesMonth_();
+  Logger.log('Last month retrieved: ' + (lastMonth || '(never run)'));
+
+  var checkResult = shouldFetchDuesSummary_();
+  Logger.log('Should fetch new data: ' + checkResult.shouldFetch);
+  Logger.log('Reason: ' + checkResult.reason);
+
+  if (checkResult.months && checkResult.months.length > 0) {
+    Logger.log('Months to fetch (' + checkResult.months.length + '):');
+    for (var i = 0; i < checkResult.months.length; i++) {
+      var month = checkResult.months[i];
+      var dateRange = getMonthDateRange_(month);
+      Logger.log('  ' + month + ': ' + dateRange.from + ' to ' + dateRange.to);
+    }
+
+    // Show what the request body will look like for the first month
+    Logger.log('\nRequest body preview (first month):');
+    var body = buildDuesSummaryBody_(1, CONFIG_DUES_SUMMARY);
+    Logger.log(JSON.stringify(body, null, 2));
+  } else {
+    Logger.log('No months to fetch');
+  }
+
+  Logger.log('=== End Debug ===');
+}

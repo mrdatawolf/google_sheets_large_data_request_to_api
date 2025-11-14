@@ -37,3 +37,11 @@ function runAccountingAgingReport() {
 function setupAccountingAgingReport() {
   setupReport(CONFIG_AGING, 'runAccountingAgingReport', 24);
 }
+
+function runDuesSummaryReport() {
+  runReport(CONFIG_DUES_SUMMARY);
+}
+
+function setupDuesSummaryReport() {
+  setupReport(CONFIG_DUES_SUMMARY, 'runDuesSummaryReport', 24);
+}

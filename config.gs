@@ -33,7 +33,7 @@ var CONFIG = (function () {
     'SystemId','FirstName','LastName','Email','Age','ParentId','Gender',
     'BirthDate','Joined','Status','GuestVisits','DependentCount','Employer',
     'LastCheckInDate','MemberSince','MemberName','EftPaymentMethod','HomeClub',
-    'UBATitle','UbaBankName','UCCType','dateCancelOn'
+    'UBATitle','UbaBankName','UCCType','DateCancelOn'
   ];
   var criteriaFields = {}; // empty object
 
@@ -221,3 +221,87 @@ var CONFIG_AGING = (function () {
     flatten: function (resultsArr) { return { main: resultsArr }; }
   });
 })();
+
+var CONFIG_DUES_SUMMARY = {
+  apiUrl: 'https://api.partners.daxko.com/api/v1/reports/22',
+  pageSize: 50,
+  format: 'json',
+
+  // User groups to track for dues summary
+  userGroups: [
+    1021,
+    1026,
+    1028,
+    1031,
+    1033,
+    1036,
+    1037,
+    1040,
+    1043,
+    1054,
+    1065,
+    1072,
+    1082,
+    1089,
+    1092,
+    1095,
+    1101,
+    1102,
+    1105,
+    1113,
+    1121,
+    1122,
+    1149,
+    1166,
+    1175,
+    1187,
+    1189,
+    1201,
+    1215,
+    1236,
+    2008,
+    2009
+    ],
+
+  daxko: {
+    initialBackoffMs: 1000,
+    maxRetries: 3
+  },
+  runtime: {
+    msBudget: 240000
+  },
+  audit: {
+    sheetName: 'daxko_audit',
+    writeLog: function (info) { appendAuditRow_(info, 'daxko_audit'); }
+  },
+  buildRequestBody: function(page) {
+    return buildDuesSummaryBody_(page, this);
+  },
+
+  // Define the two sheets this report will populate
+  sheetConfigs: [
+    {
+      sheetName: 'DuesSummary_Totals',
+      fields: [
+        'ReportMonth', 'Start Total', 'New', 'Canceled', 'Reactivate',
+        'Changed To', 'Changed From', 'On Hold', 'Off Hold', 'Removed', 'End Total', 'Net'
+      ],
+      keyField: 'ReportMonth'
+    },
+    {
+      sheetName: 'DuesSummary_Details',
+      fields: [
+        'UniqueKey', 'ReportMonth', 'User Group', 'User Group Billing Type',
+        'Start Total', 'End Total', 'Net', 'New', 'Canceled', 'Inactive', 'Expired',
+        'Changed To', 'Changed From', 'On Hold', 'Off Hold', 'Reactivate', 'Renewed'
+      ],
+      keyField: 'UniqueKey'
+    }
+  ],
+
+  // Custom functions from duesSummary.gs
+  flattenRecords: flattenDuesSummary_,
+  fetchPage: function(body, page, ctx) {
+    return fetchDuesSummaryOnce_(body, page, ctx || this);
+  }
+};
