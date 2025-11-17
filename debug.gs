@@ -163,3 +163,81 @@ function DebugDuesSummary() {
 
   Logger.log('=== End Debug ===');
 }
+
+/**
+ * Debug function for User Cancellation Sync.
+ * Shows the current sync state and what will be fetched next.
+ */
+function DebugCancellationSync() {
+  Logger.log('=== User Cancellation Sync Debug ===');
+
+  var lastSync = getLastCancellationSync_();
+  Logger.log('Last sync date: ' + (lastSync || '(never run)'));
+
+  var syncRange = getCancellationSyncRange_();
+  Logger.log('Should fetch: ' + syncRange.shouldFetch);
+  Logger.log('Reason: ' + syncRange.reason);
+
+  if (syncRange.shouldFetch) {
+    Logger.log('Date range: ' + syncRange.fromDate + ' to ' + syncRange.toDate);
+    Logger.log('API dates: ' + isoToApiDate_(syncRange.fromDate) + ' to ' + isoToApiDate_(syncRange.toDate));
+
+    // Show what the request body will look like
+    Logger.log('\nRequest body preview:');
+    var body = buildCancellationSyncBody_(1, syncRange.fromDate, syncRange.toDate);
+    Logger.log(JSON.stringify(body, null, 2));
+  }
+
+  Logger.log('=== End Debug ===');
+}
+
+/**
+ * Test the cancellation API with a simple known date range.
+ * This helps verify if the API structure is correct.
+ */
+function TestCancellationAPI() {
+  Logger.log('=== Testing Cancellation API ===');
+
+  // Test with a simple date range
+  var testBody = {
+    "format": "json",
+    "pageSize": "10",
+    "pageNumber": "1",
+    "outputFields": ["SystemId", "DateCancelOn", "CanceledReason"],
+    "criteriaFields": {
+      "user": {
+        "dateCancelOn": {
+          "from": "01/01/2025",
+          "to": "11/30/2025"
+        }
+      }
+    }
+  };
+
+  Logger.log('Test request body:');
+  Logger.log(JSON.stringify(testBody, null, 2));
+
+  try {
+    var apiUrl = 'https://api.partners.daxko.com/api/v1/reports/1';
+    var config = {
+      apiUrl: apiUrl,
+      daxko: { initialBackoffMs: 1000, maxRetries: 3 }
+    };
+
+    var text = postWithRetry_(apiUrl, testBody, config);
+    var parsed = JSON.parse(text || '{}');
+
+    Logger.log('\nAPI Response:');
+    Logger.log(JSON.stringify(parsed, null, 2));
+
+    if (parsed.success && parsed.data) {
+      Logger.log('\nSuccess! Found ' + (parsed.data.results ? parsed.data.results.length : 0) + ' records');
+    } else {
+      Logger.log('\nFailed or no data. Error: ' + (parsed.error || 'None'));
+    }
+  } catch (e) {
+    Logger.log('\nException: ' + e);
+  }
+
+  Logger.log('=== End Test ===');
+}

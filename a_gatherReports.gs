@@ -45,3 +45,33 @@ function runDuesSummaryReport() {
 function setupDuesSummaryReport() {
   setupReport(CONFIG_DUES_SUMMARY, 'runDuesSummaryReport', 24);
 }
+
+function runUserCancellationSync() {
+  syncUserCancellations();
+}
+
+function setupUserCancellationSync() {
+  var triggerName = 'runUserCancellationSync';
+  // Set up daily trigger at 2 AM (hour 2)
+  setupReport({scheduleDaily: true}, triggerName, 2);
+}
+
+function runCanceledStatusSync() {
+  syncCanceledStatusUsers();
+}
+
+function setupCanceledStatusSync() {
+  var triggerName = 'runCanceledStatusSync';
+  // Set up daily trigger at 3 AM (hour 3)
+  setupReport({scheduleDaily: true}, triggerName, 3);
+}
+
+function runCanceledWithDatesSync() {
+  syncCanceledWithDates();
+}
+
+function setupCanceledWithDatesSync() {
+  var triggerName = 'runCanceledWithDatesSync';
+  // Set up daily trigger at 4 AM (hour 4)
+  setupReport({scheduleDaily: true}, triggerName, 4);
+}

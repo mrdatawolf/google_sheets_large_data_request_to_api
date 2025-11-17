@@ -32,8 +32,8 @@ var CONFIG = (function () {
   var outputFields = [
     'SystemId','FirstName','LastName','Email','Age','ParentId','Gender',
     'BirthDate','Joined','Status','GuestVisits','DependentCount','Employer',
-    'LastCheckInDate','MemberSince','MemberName','EftPaymentMethod','HomeClub',
-    'UBATitle','UbaBankName','UCCType','DateCancelOn'
+    'LastCheckInDate','MemberSince','EftPaymentMethod','HomeClub',
+    'UCCType','DateCancelOn','CancellationReason','CanceledDate'
   ];
   var criteriaFields = {}; // empty object
 
