@@ -305,3 +305,38 @@ var CONFIG_DUES_SUMMARY = {
     return fetchDuesSummaryOnce_(body, page, ctx || this);
   }
 };
+
+var CONFIG_SCHEDULE_EVENTS = (function () {
+  var sheetName = 'ScheduledEvents';
+  var uniqueKey = 'SessionId';
+  var outputFields = [
+    'EventId', 'EventName', 'EventType', 'ComponentId', 'ComponentName',
+    'SessionId', 'SessionStatus', 'CourtCaption', 'Staff', 'Rooms',
+    'Resources', 'Location', 'ParticipantCount', 'Date', 'StartTime',
+    'EndTime', 'SetupTimeIncluded', 'CleanUpTimeIncluded', 'Notes',
+    'CanWaiveCancellationFee'
+  ];
+
+  return ck_makeConfig_({
+    sheetName: sheetName,
+    uniqueKey: uniqueKey,
+    apiUrl: 'https://api.partners.daxko.com/api/v1/schedule/events',
+    outputFields: outputFields,
+    criteriaFields: {},
+
+    defaults: { pageSize: 1, startPage: 1, format: 'json' },
+    scheduleDaily: true,
+    auditSheetName: 'daxko_audit',
+    clearBeforeWrite: true,  // Special flag to clear sheet before writing
+
+    // Custom fetch for GET request with query parameters
+    fetchPage: function (body, page, ctx) {
+      return fetchScheduleEvents_(body, page, ctx || this);
+    },
+
+    // Flatten events with sessions
+    flatten: function (resultsArr) {
+      return flattenScheduleEvents_(resultsArr);
+    }
+  });
+})();

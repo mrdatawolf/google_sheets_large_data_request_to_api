@@ -51,7 +51,23 @@ function applyColumnFormats_(sheet) {
   }
 }
 
-function upsertRowsToSheet_(records, sheetName, uniqueKey) {
+/**
+ * Clears all data rows from a sheet, keeping only the header row.
+ */
+function clearSheetData_(sheetName) {
+  var ss = SpreadsheetApp.getActive();
+  var sheet = ss && ss.getSheetByName(sheetName);
+  if (!sheet) throw new Error('Sheet not found: ' + sheetName);
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    // Delete all rows except header (row 1)
+    sheet.deleteRows(2, lastRow - 1);
+    Logger.log('Cleared ' + (lastRow - 1) + ' rows from sheet: ' + sheetName);
+  }
+}
+
+function upsertRowsToSheet_(records, sheetName, uniqueKey, clearFirst) {
   var recs = records || [];
   var ss = SpreadsheetApp.getActive();
   var sheet = ss && ss.getSheetByName(sheetName);
@@ -59,6 +75,11 @@ function upsertRowsToSheet_(records, sheetName, uniqueKey) {
 
   var lastCol = sheet.getLastColumn();
   if (lastCol === 0) throw new Error('Sheet has no header. Did you call ensureSheetWithHeaders_ first?');
+
+  // Clear sheet data if requested
+  if (clearFirst === true) {
+    clearSheetData_(sheetName);
+  }
 
   var lastRow = sheet.getLastRow();
   var header = sheet.getRange(1, 1, 1, lastCol).getValues()[0] || [];

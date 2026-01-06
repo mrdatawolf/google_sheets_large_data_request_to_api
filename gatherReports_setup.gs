@@ -39,3 +39,8 @@ function setupCanceledWithDatesSync() {
   // Set up daily trigger at 4 AM (hour 4)
   setupReport({scheduleDaily: true}, triggerName, 4);
 }
+
+function setupScheduleEventsReport() {
+  // Set up daily trigger at 6 AM (hour 6)
+  setupReport(CONFIG_SCHEDULE_EVENTS, 'runScheduleEventsReport', 6);
+}

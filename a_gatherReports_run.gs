@@ -52,3 +52,7 @@ function runCanceledStatusSync() {
 function runCanceledWithDatesSync() {
   syncCanceledWithDates();
 }
+
+function runScheduleEventsReport() {
+  runReport(CONFIG_SCHEDULE_EVENTS);
+}

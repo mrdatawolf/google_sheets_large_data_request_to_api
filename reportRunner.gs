@@ -106,13 +106,16 @@ function runReport(config) {
       ? config.flattenRecords(allResults)
       : { main: allResults }; // Ensure flattened is an object for the old path
 
+    // Check if we should clear the sheet before writing
+    var clearFirst = config.clearBeforeWrite === true;
+
     // New path: If flattenRecords returns an array of jobs, process them.
     if (Array.isArray(flattened) && flattened.length > 0 && flattened[0].sheetName) {
       for (var i = 0; i < flattened.length; i++) {
         var job = flattened[i];
         if (job.records && job.records.length > 0) {
           var sheet = ensureSheetWithHeaders_(job.sheetName, job.fields);
-          var result = upsertRowsToSheet_(job.records, job.sheetName, job.keyField);
+          var result = upsertRowsToSheet_(job.records, job.sheetName, job.keyField, clearFirst);
           appendedTotal += result.appended || 0;
           updatedTotal  += result.updated  || 0;
           if (typeof job.applyFormats === 'function') {
@@ -127,10 +130,10 @@ function runReport(config) {
           var records = (typeof sc.getRecords === 'function')
             ? sc.getRecords(flattened)
             : flattened.main; // Old path expects a .main property
-          
+
           if (records && records.length > 0) {
             var sheet = ensureSheetWithHeaders_(sc.sheetName, sc.fields);
-            var result = upsertRowsToSheet_(records, sc.sheetName, sc.keyField);
+            var result = upsertRowsToSheet_(records, sc.sheetName, sc.keyField, clearFirst);
             appendedTotal += result.appended || 0;
             updatedTotal  += result.updated  || 0;
             if (typeof sc.applyFormats === 'function') {

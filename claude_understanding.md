@@ -159,13 +159,31 @@ The Transactions API has a different structure than the Users API, so it needs c
 #### 12. **userGroupDynamicReport.gs**
 Contains custom logic for the User Group Dynamic Report (CONFIG_UGDR).
 
-#### 13. **notifications.gs**
+#### 13. **userGroupStatisticsReport.gs**
+Contains custom logic for the User Group Statistics Report (CONFIG_UGSR).
+
+#### 14. **accountingAgingReport.gs**
+Contains custom logic for the Accounting Aging Report (CONFIG_AGING) including statement period management.
+
+#### 15. **duesSummary.gs**
+Contains custom logic for the Dues Summary Report (CONFIG_DUES_SUMMARY) which populates two sheets.
+
+#### 16. **scheduleEvents.gs**
+Contains custom logic for the Schedule Events Report (CONFIG_SCHEDULE_EVENTS):
+- `fetchScheduleEvents_()`: Makes GET request with dynamic date and configurable days
+- `flattenScheduleEvents_()`: Transforms nested events/sessions structure into flat records
+- `getScheduleEventsDays_()`: Retrieves configured number of days from ScriptProperties
+- `setScheduleEventsDays_()`: Sets the number of days to fetch
+
+**Key difference**: This is the first report to use GET instead of POST and to clear sheet data before writing (no upsert).
+
+#### 17. **notifications.gs**
 Handles sending email digests after each run (not heavily used in current configs).
 
-#### 14. **debug.gs**
+#### 18. **debug.gs**
 Utility functions for debugging and development.
 
-#### 15. **raw.gs**
+#### 19. **raw.gs**
 Contains functionality to save raw API responses to Google Drive (currently disabled in configs).
 
 ## Execution Flow
@@ -335,7 +353,48 @@ Google Apps Script has 6-minute execution limit:
 
 ### 3. User Group Dynamic Report (CONFIG_UGDR)
 - **API**: `/api/v1/reports/22`
-- **Purpose**: Not fully configured yet, appears to be in development
+- **Sheet**: "UserGDR_Summary"
+- **Purpose**: Fetches user group dynamic report data
+- **Schedule**: Daily
+- **Format**: JSON
+
+### 4. User Group Statistics Report (CONFIG_UGSR)
+- **API**: `/api/v1/reports/26`
+- **Sheet**: "UserGSR_Summary"
+- **Purpose**: Fetches user group statistics report data
+- **Schedule**: Daily
+- **Format**: JSON
+
+### 5. Accounting Aging Report (CONFIG_AGING)
+- **API**: `/api/v1/reports/5`
+- **Sheet**: "AccountingAging"
+- **Unique Key**: SystemId
+- **Fields**: SystemId, LastLogin, HomeClub, UserGroupName, Field "4"
+- **Special Feature**: Statement period management (YYYY-MM format)
+- **Schedule**: Daily
+- **Format**: JSON
+
+### 6. Dues Summary Report (CONFIG_DUES_SUMMARY)
+- **API**: `/api/v1/reports/22`
+- **Sheets**: "DuesSummary_Totals" and "DuesSummary_Details"
+- **Purpose**: Tracks dues summary data for specific user groups
+- **Schedule**: Daily
+- **Format**: JSON
+
+### 7. Schedule Events Report (CONFIG_SCHEDULE_EVENTS)
+- **API**: `/api/v1/schedule/events?startDate=YYYY-MM-DD&numDays=N`
+- **Sheet**: "ScheduledEvents"
+- **Unique Key**: SessionId
+- **Fields**: 20 fields including event details, sessions, staff, rooms, resources
+- **Special Features**:
+  - **GET request** instead of POST
+  - **Clears sheet data** before each write (no upsert)
+  - **Dynamic date**: Uses current date as startDate
+  - **Configurable days**: numDays from ScriptProperties (default: 7)
+  - **No pagination**: Single request fetches all events
+- **Schedule**: Daily at 6 AM
+- **Format**: JSON
+- **Module**: scheduleEvents.gs
 
 ## Error Handling
 

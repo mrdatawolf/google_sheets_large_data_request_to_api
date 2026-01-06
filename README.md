@@ -265,6 +265,46 @@ setupAccountingAgingReport()
 - UserGroupName
 - Field "4" (numeric aging data)
 
+### Running the Schedule Events Report
+
+The Schedule Events Report (`CONFIG_SCHEDULE_EVENTS`) fetches upcoming scheduled events and **replaces** all sheet data with fresh data on each run (unlike other reports that use upsert).
+
+#### Configure Number of Days
+```javascript
+// Set how many days forward to fetch events (default: 7 days)
+setScheduleEventsDays_(14)  // Fetch 14 days of events
+```
+
+The number of days is stored in ScriptProperties as `SCHEDULE_EVENTS_DAYS`.
+
+#### Run Manually
+```javascript
+// Fetches events starting from today for the configured number of days
+runScheduleEventsReport()
+```
+
+#### Set Up Daily Automation
+```javascript
+// Creates daily trigger at 6 AM
+setupScheduleEventsReport()
+```
+
+**Important Differences:**
+- **Data Replacement:** Unlike other reports, this clears all existing data and writes fresh data on each run
+- **GET Request:** Uses HTTP GET with query parameters instead of POST with body
+- **Dynamic Date:** Always uses the current date as the start date
+- **No Pagination:** Fetches all events in a single request
+
+**Note:** The report will be imported to a sheet named "ScheduledEvents" with these fields:
+- EventId, EventName, EventType
+- ComponentId, ComponentName
+- SessionId, SessionStatus, CourtCaption
+- Staff, Rooms, Resources, Location
+- ParticipantCount
+- Date, StartTime, EndTime
+- SetupTimeIncluded, CleanUpTimeIncluded
+- Notes, CanWaiveCancellationFee
+
 ## Configuration
 
 ### Report Configuration Structure
@@ -560,7 +600,8 @@ DebugAuthOnce()
 
 #### `sheet.gs` - Google Sheets Operations
 - `ensureSheetWithHeaders_(sheetName, fields)` - Create/update sheet structure
-- `upsertRowsToSheet_(sheetName, records, fields, keyField)` - Update/insert records
+- `upsertRowsToSheet_(sheetName, records, fields, keyField, clearFirst)` - Update/insert records (with optional clear)
+- `clearSheetData_(sheetName)` - Clear all data rows, keeping headers
 - `castValue_(val, fieldName)` - Type conversion (dates, numbers)
 - `parseDateFlexible_(val)` - Robust date parsing
 
@@ -600,6 +641,12 @@ DebugAuthOnce()
 - `getCurrentStatementPeriod_()` - Get previous month's period automatically
 - `setStatementPeriod_(period)` - Set custom statement period override
 - `clearStatementPeriod_()` - Clear custom period override
+
+#### `scheduleEvents.gs`
+- `fetchScheduleEvents_(body, page, ctx)` - Fetch schedule events via GET request
+- `flattenScheduleEvents_(eventsArr)` - Transform events with sessions into flat records
+- `getScheduleEventsDays_()` - Get configured number of days to fetch (default: 7)
+- `setScheduleEventsDays_(numDays)` - Set number of days to fetch events for
 
 ### Support Modules
 
@@ -761,6 +808,9 @@ The framework is actively used in production for importing Daxko API data. Curre
 - **Transactions Report:** Daily sync of financial transactions
 - **User Group Dynamic Report:** Group membership data
 - **User Group Statistics Report:** Group statistics
+- **Accounting Aging Report:** Daily sync of accounting aging data with statement period management
+- **Dues Summary Report:** Daily sync of dues summary totals and details
+- **Schedule Events Report:** Daily sync of scheduled events (replaces data each run)
 
 ### Known Limitations
 
