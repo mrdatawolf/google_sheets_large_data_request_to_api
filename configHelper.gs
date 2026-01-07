@@ -91,7 +91,7 @@ function ck_makeConfig_(o) {
     return { main: resultsArr };
   }
 
-  // --- Merge everything --- 
+  // --- Merge everything ---
   return ck_merge_(commonBlocks, {
     apiUrl: o.apiUrl,
     format: format,
@@ -100,6 +100,7 @@ function ck_makeConfig_(o) {
     uniqueKey: o.uniqueKey,
     scheduleDaily: !!o.scheduleDaily,
     sheetName: o.sheetName,
+    clearBeforeWrite: !!o.clearBeforeWrite,  // Pass through clearBeforeWrite flag
     request: ck_buildRequestSnapshot_(format, pageSize, startPage, o.outputFields, o.criteriaFields),
 
     buildRequestBody: (typeof o.buildBody === 'function') ? function (p) { return o.buildBody(p, this); } : defaultBuildBody,

@@ -53,6 +53,7 @@ function applyColumnFormats_(sheet) {
 
 /**
  * Clears all data rows from a sheet, keeping only the header row.
+ * Uses clearContent() instead of deleteRows() to avoid Google Sheets row limit issues.
  */
 function clearSheetData_(sheetName) {
   var ss = SpreadsheetApp.getActive();
@@ -61,9 +62,12 @@ function clearSheetData_(sheetName) {
 
   var lastRow = sheet.getLastRow();
   if (lastRow > 1) {
-    // Delete all rows except header (row 1)
-    sheet.deleteRows(2, lastRow - 1);
-    Logger.log('Cleared ' + (lastRow - 1) + ' rows from sheet: ' + sheetName);
+    var lastCol = sheet.getLastColumn();
+    if (lastCol > 0) {
+      // Clear content from all data rows (keep header)
+      sheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
+      Logger.log('Cleared ' + (lastRow - 1) + ' rows from sheet: ' + sheetName);
+    }
   }
 }
 
@@ -75,6 +79,8 @@ function upsertRowsToSheet_(records, sheetName, uniqueKey, clearFirst) {
 
   var lastCol = sheet.getLastColumn();
   if (lastCol === 0) throw new Error('Sheet has no header. Did you call ensureSheetWithHeaders_ first?');
+
+  Logger.log('upsertRowsToSheet: sheet=' + sheetName + ', records=' + recs.length + ', clearFirst=' + clearFirst);
 
   // Clear sheet data if requested
   if (clearFirst === true) {

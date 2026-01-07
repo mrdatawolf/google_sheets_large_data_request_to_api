@@ -293,17 +293,79 @@ setupScheduleEventsReport()
 - **Data Replacement:** Unlike other reports, this clears all existing data and writes fresh data on each run
 - **GET Request:** Uses HTTP GET with query parameters instead of POST with body
 - **Dynamic Date:** Always uses the current date as the start date
-- **No Pagination:** Fetches all events in a single request
+- **No Pagination:** Fetches all events in a single request (pageSize: 9999)
+- **Filtering:** Automatically excludes sessions with `status: "canceled"` and sessions with empty participants
 
 **Note:** The report will be imported to a sheet named "ScheduledEvents" with these fields:
 - EventId, EventName, EventType
 - ComponentId, ComponentName
 - SessionId, SessionStatus, CourtCaption
 - Staff, Rooms, Resources, Location
-- ParticipantCount
+- Participants, ParticipantCount
 - Date, StartTime, EndTime
 - SetupTimeIncluded, CleanUpTimeIncluded
 - Notes, CanWaiveCancellationFee
+
+**Data Quality:**
+- Only sessions with participants are included
+- Canceled sessions are automatically filtered out
+- Participant names are extracted as comma-separated string (like Staff and Rooms)
+
+### User Cancellation Sync
+
+The system includes three different approaches to syncing user cancellation data to the Users sheet. All three update existing rows in the Users sheet with `DateCancelOn` and `CancelationReason` fields.
+
+#### Incremental Cancellation Sync
+
+The recommended approach for daily updates. It fetches only users canceled since the last sync.
+
+```javascript
+// Run manually
+runUserCancellationSync()
+
+// Set up daily automation (runs at 2 AM)
+setupUserCancellationSync()
+
+// View or set last sync date
+getLastCancellationSync_()
+setLastCancellationSyncManual_("2025-01-01")
+clearLastCancellationSync_()
+```
+
+**How it works:**
+- First run: Fetches all cancellations from 2025-01-01 to end of current month
+- Subsequent runs: Fetches only new cancellations since last sync date
+- Automatically tracks last sync date in ScriptProperties as `USER_CANCELLATION_LAST_SYNC`
+
+#### Status-Based Sync
+
+Fetches all users with "Canceled" member status, regardless of date.
+
+```javascript
+// Run manually
+runCanceledStatusSync()
+
+// Set up daily automation (runs at 3 AM)
+setupCanceledStatusSync()
+```
+
+**Use case:** When you want to ensure all canceled users have their cancellation data updated, not just recent ones.
+
+#### Combined Sync (Status + Date)
+
+Fetches users with "Canceled" status AND a cancellation date.
+
+```javascript
+// Run manually
+runCanceledWithDatesSync()
+
+// Set up daily automation (runs at 4 AM)
+setupCanceledWithDatesSync()
+```
+
+**Use case:** When you want all canceled users but only those with valid cancellation dates.
+
+**Note:** All three sync methods update the same `DateCancelOn` and `CancelationReason` columns in the Users sheet. You can use one, two, or all three depending on your data quality needs.
 
 ## Configuration
 
@@ -562,11 +624,13 @@ DebugAuthOnce()
 
 ### Core Modules
 
-#### `main.gs` - Entry Points
-- `setupAll()` - Create all scheduled triggers
-- `runUsersReport()` - Run users report
-- `runTransactionsReport()` - Run transactions report
+#### `main.gs` - Legacy Entry Points
+- `setupAll()` - Create all scheduled triggers (legacy)
+- `runUsersReport()` - Run users report (legacy)
+- `runTransactionsReport()` - Run transactions report (legacy)
 - `DebugAuthOnce()` - Test authentication
+
+**Note:** For current entry points, see `a_gatherReports_run.gs` and `gatherReports_setup.gs`
 
 #### `reportRunner.gs` - Execution Engine
 - `runReport(config)` - Main execution function
@@ -582,6 +646,8 @@ DebugAuthOnce()
 - `CONFIG_UGDR` - User group dynamic report
 - `CONFIG_UGSR` - User group statistics report
 - `CONFIG_AGING` - Accounting aging report (with statement period support)
+- `CONFIG_DUES_SUMMARY` - Dues summary report (populates two sheets)
+- `CONFIG_SCHEDULE_EVENTS` - Schedule events report (with filtering)
 - `CONFIG_TEST` - Test configuration (for unit tests)
 
 #### `configHelper.gs` - Configuration Factory
@@ -645,8 +711,35 @@ DebugAuthOnce()
 #### `scheduleEvents.gs`
 - `fetchScheduleEvents_(body, page, ctx)` - Fetch schedule events via GET request
 - `flattenScheduleEvents_(eventsArr)` - Transform events with sessions into flat records
+  - Filters out sessions with status="canceled"
+  - Filters out sessions with empty participants
+  - Extracts participant names as comma-separated string
 - `getScheduleEventsDays_()` - Get configured number of days to fetch (default: 7)
 - `setScheduleEventsDays_(numDays)` - Set number of days to fetch events for
+
+#### `userCancellationSync.gs`
+- `syncUserCancellations()` - Incremental sync of cancellation data since last run
+- `syncCanceledStatusUsers()` - Fetch all users with "Canceled" status
+- `syncCanceledWithDates()` - Fetch canceled users with cancellation dates
+- `fetchCancellationData_(fromDate, toDate)` - Fetch users canceled in date range
+- `updateUsersCancellationData_(records)` - Update Users sheet with cancellation info
+- `getCancellationSyncRange_()` - Determine date range for incremental sync
+- `getLastCancellationSync_()` / `setLastCancellationSync_()` - Manage sync state
+
+#### `a_gatherReports_run.gs`
+Entry point functions for all reports:
+- `runUsersReport()`, `runTransactionsReport()`, `runUserGroupDynamicReport()`
+- `runUserGroupStatisticsReport()`, `runAccountingAgingReport()`
+- `runDuesSummaryReport()`, `runScheduleEventsReport()`
+- `runUserCancellationSync()`, `runCanceledStatusSync()`, `runCanceledWithDatesSync()`
+- `runGetAccessToken()` - Utility to get/refresh access token
+
+#### `gatherReports_setup.gs`
+Setup functions for creating scheduled triggers:
+- `setupUsers()`, `setupTransactions()`, `setupUserGroupDynamicReport()`
+- `setupUserGroupStatisticsReport()`, `setupAccountingAgingReport()`
+- `setupDuesSummaryReport()`, `setupScheduleEventsReport()`
+- `setupUserCancellationSync()`, `setupCanceledStatusSync()`, `setupCanceledWithDatesSync()`
 
 ### Support Modules
 
@@ -802,15 +895,63 @@ To use with a different API:
 
 **Production Ready:** ✅
 
-The framework is actively used in production for importing Daxko API data. Current reports:
+The framework is actively used in production for importing Daxko API data.
 
-- **Users Report:** Daily sync of member/user data
-- **Transactions Report:** Daily sync of financial transactions
-- **User Group Dynamic Report:** Group membership data
-- **User Group Statistics Report:** Group statistics
-- **Accounting Aging Report:** Daily sync of accounting aging data with statement period management
-- **Dues Summary Report:** Daily sync of dues summary totals and details
-- **Schedule Events Report:** Daily sync of scheduled events (replaces data each run)
+### Reports
+
+- **Users Report** (`CONFIG`): Daily sync of member/user data
+  - Schedule: Every 1 hour
+  - Sheet: "Users"
+  - Method: POST with upsert
+
+- **Transactions Report** (`CONFIG_TX`): Daily sync of financial transactions
+  - Schedule: Every 24 hours
+  - Sheet: "Transactions"
+  - Method: POST with upsert
+
+- **User Group Dynamic Report** (`CONFIG_UGDR`): Group membership data
+  - Schedule: Every 24 hours
+  - Sheet: "UserGDR_Summary"
+  - Method: POST with upsert
+
+- **User Group Statistics Report** (`CONFIG_UGSR`): Group statistics
+  - Schedule: Every 24 hours
+  - Sheet: "UserGSR_Summary"
+  - Method: POST with upsert
+
+- **Accounting Aging Report** (`CONFIG_AGING`): Accounting aging data with statement period management
+  - Schedule: Every 24 hours
+  - Sheet: "AccountingAging"
+  - Method: POST with upsert
+  - Features: Statement period management (YYYY-MM format)
+
+- **Dues Summary Report** (`CONFIG_DUES_SUMMARY`): Dues summary totals and details
+  - Schedule: Every 24 hours
+  - Sheets: "DuesSummary_Totals" and "DuesSummary_Details"
+  - Method: POST with upsert
+
+- **Schedule Events Report** (`CONFIG_SCHEDULE_EVENTS`): Scheduled events with filtering
+  - Schedule: Every 6 hours (runs at 6 AM)
+  - Sheet: "ScheduledEvents"
+  - Method: GET with data replacement (no upsert)
+  - Features: Filters out canceled sessions and empty participants, configurable date range
+
+### Data Sync Features
+
+- **User Cancellation Sync**: Incremental sync of cancellation dates and reasons
+  - Schedule: Every 2 hours (runs at 2 AM)
+  - Updates: Existing Users sheet rows
+  - Method: Incremental date-based sync
+
+- **Canceled Status Sync**: Sync all users with "Canceled" member status
+  - Schedule: Every 3 hours (runs at 3 AM)
+  - Updates: Existing Users sheet rows
+  - Method: Status-based filter
+
+- **Canceled With Dates Sync**: Sync canceled users with cancellation dates
+  - Schedule: Every 4 hours (runs at 4 AM)
+  - Updates: Existing Users sheet rows
+  - Method: Combined status and date filter
 
 ### Known Limitations
 
