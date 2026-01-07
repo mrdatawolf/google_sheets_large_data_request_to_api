@@ -172,19 +172,70 @@ Contains custom logic for the Dues Summary Report (CONFIG_DUES_SUMMARY) which po
 Contains custom logic for the Schedule Events Report (CONFIG_SCHEDULE_EVENTS):
 - `fetchScheduleEvents_()`: Makes GET request with dynamic date and configurable days
 - `flattenScheduleEvents_()`: Transforms nested events/sessions structure into flat records
+  - **Filters out**: Sessions with status="canceled"
+  - **Filters out**: Sessions with empty participants array
+  - **Extracts**: Participant names as comma-separated string (like Staff and Rooms)
 - `getScheduleEventsDays_()`: Retrieves configured number of days from ScriptProperties
 - `setScheduleEventsDays_()`: Sets the number of days to fetch
 
-**Key difference**: This is the first report to use GET instead of POST and to clear sheet data before writing (no upsert).
+**Key differences**:
+- Uses GET instead of POST
+- Clears sheet data before writing (no upsert)
+- Filters data at the flattening stage
+- Large pageSize (9999) prevents pagination loop issues
 
 #### 17. **notifications.gs**
 Handles sending email digests after each run (not heavily used in current configs).
 
-#### 18. **debug.gs**
+#### 18. **userCancellationSync.gs**
+Contains functionality for syncing user cancellation data to the Users sheet:
+- `syncUserCancellations()`: Main sync function that fetches incremental cancellation data
+- `syncCanceledStatusUsers()`: Fetches all users with "Canceled" status
+- `syncCanceledWithDates()`: Fetches canceled users that have cancellation dates
+- `fetchCancellationData_()`: Fetches users canceled within a date range
+- `updateUsersCancellationData_()`: Updates Users sheet with DateCancelOn and CancelationReason
+- `getCancellationSyncRange_()`: Determines date range for incremental sync
+- `getLastCancellationSync_()`: Gets last sync date from ScriptProperties
+- `setLastCancellationSync_()`: Saves last sync date
+
+**Key features**:
+- Incremental sync based on last run date
+- Updates existing Users sheet rows (not a separate sheet)
+- Tracks last sync date in ScriptProperties
+- Three sync strategies: incremental, status-based, and combined
+
+#### 19. **debug.gs**
 Utility functions for debugging and development.
 
-#### 19. **raw.gs**
+#### 20. **raw.gs**
 Contains functionality to save raw API responses to Google Drive (currently disabled in configs).
+
+#### 21. **a_gatherReports_run.gs**
+Entry point functions for running all reports manually:
+- `runUsersReport()`: Runs CONFIG
+- `runTransactionsReport()`: Runs CONFIG_TX
+- `runUserGroupDynamicReport()`: Runs CONFIG_UGDR
+- `runUserGroupStatisticsReport()`: Runs CONFIG_UGSR
+- `runAccountingAgingReport()`: Runs CONFIG_AGING
+- `runDuesSummaryReport()`: Runs CONFIG_DUES_SUMMARY
+- `runScheduleEventsReport()`: Runs CONFIG_SCHEDULE_EVENTS
+- `runUserCancellationSync()`: Runs user cancellation sync
+- `runCanceledStatusSync()`: Runs canceled status sync
+- `runCanceledWithDatesSync()`: Runs canceled with dates sync
+- `runGetAccessToken()`: Utility to get/refresh access token
+
+#### 22. **gatherReports_setup.gs**
+Setup functions for creating scheduled triggers for all reports:
+- `setupUsers()`: Daily trigger for users report (every 1 hour)
+- `setupTransactions()`: Daily trigger for transactions (every 24 hours)
+- `setupUserGroupDynamicReport()`: Daily trigger (every 24 hours)
+- `setupUserGroupStatisticsReport()`: Daily trigger (every 24 hours)
+- `setupAccountingAgingReport()`: Daily trigger (every 24 hours)
+- `setupDuesSummaryReport()`: Daily trigger (every 24 hours)
+- `setupScheduleEventsReport()`: Daily trigger at 6 AM (every 6 hours)
+- `setupUserCancellationSync()`: Daily trigger at 2 AM (every 2 hours)
+- `setupCanceledStatusSync()`: Daily trigger at 3 AM (every 3 hours)
+- `setupCanceledWithDatesSync()`: Daily trigger at 4 AM (every 4 hours)
 
 ## Execution Flow
 
@@ -385,13 +436,15 @@ Google Apps Script has 6-minute execution limit:
 - **API**: `/api/v1/schedule/events?startDate=YYYY-MM-DD&numDays=N`
 - **Sheet**: "ScheduledEvents"
 - **Unique Key**: SessionId
-- **Fields**: 20 fields including event details, sessions, staff, rooms, resources
+- **Fields**: 21 fields including event details, sessions, staff, rooms, resources, participants
 - **Special Features**:
   - **GET request** instead of POST
   - **Clears sheet data** before each write (no upsert)
   - **Dynamic date**: Uses current date as startDate
   - **Configurable days**: numDays from ScriptProperties (default: 7)
-  - **No pagination**: Single request fetches all events
+  - **No pagination**: Single request fetches all events (pageSize: 9999)
+  - **Filtering**: Excludes sessions with status="canceled" and sessions with empty participants array
+  - **Participants**: Extracts participant names as comma-separated string
 - **Schedule**: Daily at 6 AM
 - **Format**: JSON
 - **Module**: scheduleEvents.gs

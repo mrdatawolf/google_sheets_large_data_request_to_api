@@ -312,9 +312,9 @@ var CONFIG_SCHEDULE_EVENTS = (function () {
   var outputFields = [
     'EventId', 'EventName', 'EventType', 'ComponentId', 'ComponentName',
     'SessionId', 'SessionStatus', 'CourtCaption', 'Staff', 'Rooms',
-    'Resources', 'Location', 'ParticipantCount', 'Date', 'StartTime',
-    'EndTime', 'SetupTimeIncluded', 'CleanUpTimeIncluded', 'Notes',
-    'CanWaiveCancellationFee'
+    'Resources', 'Location', 'Participants', 'ParticipantIds', 'ParticipantEmails',
+    'ParticipantCount', 'Date', 'StartTime', 'EndTime', 'SetupTimeIncluded',
+    'CleanUpTimeIncluded', 'Notes', 'CanWaiveCancellationFee'
   ];
 
   return ck_makeConfig_({
@@ -324,7 +324,7 @@ var CONFIG_SCHEDULE_EVENTS = (function () {
     outputFields: outputFields,
     criteriaFields: {},
 
-    defaults: { pageSize: 1, startPage: 1, format: 'json' },
+    defaults: { pageSize: 9999, startPage: 1, format: 'json' },
     scheduleDaily: true,
     auditSheetName: 'daxko_audit',
     clearBeforeWrite: true,  // Special flag to clear sheet before writing

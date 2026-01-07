@@ -7,14 +7,70 @@
 
 /**
  * Get the number of days to fetch from ScriptProperties
- * Default to 7 days if not set
+ * Default to 2 days if not set
  */
 function getScheduleEventsDays_() {
   var days = getProp_('SCHEDULE_EVENTS_DAYS');
   if (!days) {
-    return 7; // Default to 7 days
+    return 2; // Default to 2 days
   }
   return Number(days);
+}
+
+/**
+ * Build a map of SystemId -> Email from the Users sheet
+ * Returns an object with SystemId as key and Email as value
+ */
+function buildUserEmailMap_() {
+  try {
+    var ss = SpreadsheetApp.getActive();
+    var usersSheet = ss.getSheetByName('Users');
+
+    if (!usersSheet) {
+      Logger.log('Users sheet not found - participant emails will be empty');
+      return {};
+    }
+
+    var lastRow = usersSheet.getLastRow();
+    if (lastRow <= 1) {
+      Logger.log('Users sheet is empty - participant emails will be empty');
+      return {};
+    }
+
+    var lastCol = usersSheet.getLastColumn();
+    var data = usersSheet.getRange(1, 1, lastRow, lastCol).getValues();
+    var headers = data[0];
+
+    // Find SystemId and Email column indices
+    var systemIdCol = -1;
+    var emailCol = -1;
+    for (var i = 0; i < headers.length; i++) {
+      if (headers[i] === 'SystemId') systemIdCol = i;
+      if (headers[i] === 'Email') emailCol = i;
+    }
+
+    if (systemIdCol === -1 || emailCol === -1) {
+      Logger.log('SystemId or Email column not found in Users sheet - participant emails will be empty');
+      return {};
+    }
+
+    // Build the map
+    var emailMap = {};
+    for (var row = 1; row < data.length; row++) {
+      var systemId = data[row][systemIdCol];
+      var email = data[row][emailCol];
+      if (systemId && email) {
+        emailMap[String(systemId)] = String(email);
+      }
+    }
+
+    Logger.log('Built email map with ' + Object.keys(emailMap).length + ' entries');
+    return emailMap;
+
+  } catch (e) {
+    Logger.log('Error building user email map: ' + e);
+    return {};
+  }
 }
 
 /**
@@ -44,7 +100,7 @@ function fetchScheduleEvents_(body, page, ctx) {
 
   // Build URL with query parameters
   var url = ctx.apiUrl + '?startDate=' + startDate + '&numDays=' + numDays;
-
+  Logger.log("url: " + url)
   // Make GET request with authentication
   var attempt = 0;
   var backoff = (ctx.daxko && ctx.daxko.initialBackoffMs) || 1000;
@@ -67,6 +123,8 @@ function fetchScheduleEvents_(body, page, ctx) {
 
         // Extract events from data.events
         var events = (json && json.data && json.data.events) || [];
+
+        Logger.log('API returned ' + events.length + ' events');
 
         return {
           payloadText: text,
@@ -111,10 +169,26 @@ function fetchScheduleEvents_(body, page, ctx) {
 function flattenScheduleEvents_(eventsArr) {
   var flattened = [];
 
+  Logger.log('Flattening ' + eventsArr.length + ' events');
+
+  // Build email lookup map from Users sheet
+  var emailMap = buildUserEmailMap_();
+
   eventsArr.forEach(function(event) {
     var sessions = event.sessions || [];
 
     sessions.forEach(function(session) {
+      // Skip canceled sessions
+      if (session.status && session.status.toLowerCase() === 'canceled') {
+        return;
+      }
+
+      // Skip sessions with no participants
+      var participants = session.participants || [];
+      if (participants.length === 0) {
+        return;
+      }
+
       // Extract staff names
       var staffNames = (session.staff || []).map(function(s) {
         return s.name || '';
@@ -128,8 +202,27 @@ function flattenScheduleEvents_(eventsArr) {
       // Extract resource names
       var resources = (session.resources || []).join(', ');
 
+      // Extract participant names
+      var participantNames = participants.map(function(p) {
+        return p.name || '';
+      }).join(', ');
+
+      // Extract participant IDs
+      var participantIds = participants.map(function(p) {
+        return p.id || '';
+      }).filter(function(id) { return id !== ''; }).join(', ');
+
+      // Look up participant emails from Users sheet
+      var participantEmails = participants.map(function(p) {
+        var id = p.id;
+        if (id && emailMap[String(id)]) {
+          return emailMap[String(id)];
+        }
+        return '';
+      }).filter(function(email) { return email !== ''; }).join(', ');
+
       // Extract participant count
-      var participantCount = (session.participants || []).length;
+      var participantCount = participants.length;
 
       // Create flattened record
       flattened.push({
@@ -145,6 +238,9 @@ function flattenScheduleEvents_(eventsArr) {
         'Rooms': roomNames,
         'Resources': resources,
         'Location': session.location,
+        'Participants': participantNames,
+        'ParticipantIds': participantIds,
+        'ParticipantEmails': participantEmails,
         'ParticipantCount': participantCount,
         'Date': session.date,
         'StartTime': session.startTime,
@@ -156,6 +252,8 @@ function flattenScheduleEvents_(eventsArr) {
       });
     });
   });
+
+  Logger.log('Flattened to ' + flattened.length + ' session records (after filtering)');
 
   return { main: flattened };
 }
