@@ -178,16 +178,7 @@ function flattenScheduleEvents_(eventsArr) {
     var sessions = event.sessions || [];
 
     sessions.forEach(function(session) {
-      // Skip canceled sessions
-      if (session.status && session.status.toLowerCase() === 'canceled') {
-        return;
-      }
-
-      // Skip sessions with no participants
       var participants = session.participants || [];
-      if (participants.length === 0) {
-        return;
-      }
 
       // Extract staff names
       var staffNames = (session.staff || []).map(function(s) {
@@ -253,7 +244,7 @@ function flattenScheduleEvents_(eventsArr) {
     });
   });
 
-  Logger.log('Flattened to ' + flattened.length + ' session records (after filtering)');
+  Logger.log('Flattened to ' + flattened.length + ' session records (warehouse - unfiltered)');
 
   return { main: flattened };
 }
