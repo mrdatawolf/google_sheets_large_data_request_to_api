@@ -44,3 +44,7 @@ function setupScheduleEventsReport() {
   // Set up daily trigger at 6 AM (hour 6)
   setupReport(CONFIG_SCHEDULE_EVENTS, 'runScheduleEventsReport', 6);
 }
+
+function setupUserPhones() {
+  setupReport(CONFIG_PHONES, 'runUserPhonesReport',1);
+}

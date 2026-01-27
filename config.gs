@@ -340,3 +340,30 @@ var CONFIG_SCHEDULE_EVENTS = (function () {
     }
   });
 })();
+
+var CONFIG_PHONES = (function () {
+  var sheetName = 'UserPhones';
+  var uniqueKey = 'SystemId';
+  var outputFields = [
+    'SystemId', 'PhoneHome', 'PhoneWork', 'PhoneCell', 'LastName'
+  ];
+  var criteriaFields = {};
+
+  return ck_makeConfig_({
+    sheetName: sheetName,
+    uniqueKey: uniqueKey,
+    apiUrl: 'https://api.partners.daxko.com/api/v1/reports/1',
+    outputFields: outputFields,
+    criteriaFields: criteriaFields,
+
+    defaults: { pageSize: 250, startPage: 1, format: 'json' },
+    scheduleDaily: true,
+    auditSheetName: 'daxko_audit',
+
+    fetchPage: function (body, page, ctx) {
+      return fetchDaxkoPagePost_(body, page, ctx || this);
+    },
+
+    flatten: function (resultsArr) { return { main: resultsArr }; }
+  });
+})();

@@ -56,3 +56,7 @@ function runCanceledWithDatesSync() {
 function runScheduleEventsReport() {
   runReport(CONFIG_SCHEDULE_EVENTS);
 }
+
+function runUserPhonesReport() {
+  runReport(CONFIG_PHONES);
+}
