@@ -345,7 +345,7 @@ var CONFIG_PHONES = (function () {
   var sheetName = 'UserPhones';
   var uniqueKey = 'SystemId';
   var outputFields = [
-    'SystemId', 'PhoneHome', 'PhoneWork', 'PhoneCell', 'LastName'
+    'SystemId', 'PhoneHome', 'PhoneWork', 'PhoneCell'
   ];
   var criteriaFields = {};
 

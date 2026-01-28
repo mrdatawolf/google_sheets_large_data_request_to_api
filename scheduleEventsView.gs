@@ -46,6 +46,107 @@ function getDataViewsSpreadsheetId_() {
 }
 
 /**
+ * Build a map of SystemId -> Phone data from the UserPhones sheet
+ * Returns an object with SystemId as key and phone object as value
+ */
+function buildUserPhoneMap_() {
+  try {
+    var ss = SpreadsheetApp.getActive();
+    var phonesSheet = ss.getSheetByName('UserPhones');
+
+    if (!phonesSheet) {
+      Logger.log('UserPhones sheet not found - participant phones will be empty');
+      return {};
+    }
+
+    var lastRow = phonesSheet.getLastRow();
+    if (lastRow <= 1) {
+      Logger.log('UserPhones sheet is empty - participant phones will be empty');
+      return {};
+    }
+
+    var lastCol = phonesSheet.getLastColumn();
+    var data = phonesSheet.getRange(1, 1, lastRow, lastCol).getValues();
+    var headers = data[0];
+
+    // Find column indices
+    var systemIdCol = -1;
+    var phoneHomeCol = -1;
+    var phoneWorkCol = -1;
+    var phoneCellCol = -1;
+
+    for (var i = 0; i < headers.length; i++) {
+      if (headers[i] === 'SystemId') systemIdCol = i;
+      if (headers[i] === 'PhoneHome') phoneHomeCol = i;
+      if (headers[i] === 'PhoneWork') phoneWorkCol = i;
+      if (headers[i] === 'PhoneCell') phoneCellCol = i;
+    }
+
+    if (systemIdCol === -1) {
+      Logger.log('SystemId column not found in UserPhones sheet - participant phones will be empty');
+      return {};
+    }
+
+    // Build the map
+    var phoneMap = {};
+    for (var row = 1; row < data.length; row++) {
+      var systemId = data[row][systemIdCol];
+      if (systemId) {
+        phoneMap[String(systemId)] = {
+          home: phoneHomeCol >= 0 ? String(data[row][phoneHomeCol] || '') : '',
+          work: phoneWorkCol >= 0 ? String(data[row][phoneWorkCol] || '') : '',
+          cell: phoneCellCol >= 0 ? String(data[row][phoneCellCol] || '') : ''
+        };
+      }
+    }
+
+    Logger.log('Built phone map with ' + Object.keys(phoneMap).length + ' entries');
+    return phoneMap;
+
+  } catch (e) {
+    Logger.log('Error building user phone map: ' + e);
+    return {};
+  }
+}
+
+/**
+ * Look up phone numbers for a comma-separated list of participant IDs
+ * Returns an object with arrays of home, work, and cell phones
+ */
+function lookupParticipantPhones_(participantIds, phoneMap) {
+  var homePhones = [];
+  var workPhones = [];
+  var cellPhones = [];
+
+  if (!participantIds || !phoneMap) {
+    return { home: '', work: '', cell: '' };
+  }
+
+  // Split the comma-separated IDs
+  var ids = String(participantIds).split(',').map(function(id) {
+    return id.trim();
+  }).filter(function(id) {
+    return id !== '';
+  });
+
+  // Look up each ID
+  ids.forEach(function(id) {
+    var phones = phoneMap[id];
+    if (phones) {
+      if (phones.home) homePhones.push(phones.home);
+      if (phones.work) workPhones.push(phones.work);
+      if (phones.cell) cellPhones.push(phones.cell);
+    }
+  });
+
+  return {
+    home: homePhones.join(', '),
+    work: workPhones.join(', '),
+    cell: cellPhones.join(', ')
+  };
+}
+
+/**
  * Read all data from the ScheduledEvents warehouse sheet
  * Returns an array of objects with the data
  */
@@ -90,6 +191,9 @@ function createScheduledEventsView_(warehouseRecords) {
 
   Logger.log('Filtering ' + warehouseRecords.length + ' warehouse records for view');
 
+  // Build phone lookup map from UserPhones sheet
+  var phoneMap = buildUserPhoneMap_();
+
   warehouseRecords.forEach(function(record) {
     // Skip canceled sessions
     if (record.SessionStatus && String(record.SessionStatus).toLowerCase() === 'canceled') {
@@ -116,6 +220,9 @@ function createScheduledEventsView_(warehouseRecords) {
     var dateStartTime = combineDateAndTime_(record.Date, startTime);
     var dateEndTime = combineDateAndTime_(record.Date, endTime);
 
+    // Look up phone numbers for participants
+    var phones = lookupParticipantPhones_(record.ParticipantIds, phoneMap);
+
     // Create view record with selected columns only
     filtered.push({
       'EventId': record.EventId || '',
@@ -123,7 +230,10 @@ function createScheduledEventsView_(warehouseRecords) {
       'Staff': record.Staff || '',
       'Location': record.Location || '',
       'Participants': record.Participants || '',
-      'ParticipantEmails': record.ParticipantEmails || '',
+      'Emails': record.ParticipantEmails || '',
+      'PhonesHome': phones.home,
+      'PhonesWork': phones.work,
+      'PhonesCell': phones.cell,
       'Date': record.Date || '',
       'StartTime': startTime,
       'EndTime': endTime,
@@ -158,7 +268,7 @@ function consolidateRecords_(records) {
       record.Staff || '',
       record.Location || '',
       record.Participants || '',
-      record.ParticipantEmails || '',
+      record.Emails || '',
       formatDateKey_(record.Date)
     ].join('|||');
 
@@ -207,7 +317,10 @@ function consolidateRecords_(records) {
           'Staff': group[0].Staff,
           'Location': group[0].Location,
           'Participants': group[0].Participants,
-          'ParticipantEmails': group[0].ParticipantEmails,
+          'Emails': group[0].Emails,
+          'PhonesHome': group[0].PhonesHome,
+          'PhonesWork': group[0].PhonesWork,
+          'PhonesCell': group[0].PhonesCell,
           'Date': group[0].Date,
           'StartTime': earliest.StartTime,
           'EndTime': latest.EndTime,
@@ -353,7 +466,10 @@ function writeScheduledEventsView_(viewRecords) {
     'Staff',
     'Location',
     'Participants',
-    'ParticipantEmails',
+    'Emails',
+    'PhonesHome',
+    'PhonesWork',
+    'PhonesCell',
     'Date',
     'StartTime',
     'EndTime',
