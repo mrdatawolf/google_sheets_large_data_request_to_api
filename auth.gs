@@ -45,9 +45,7 @@ function refreshAccessToken_() {
 
   var resp = postJson_(tokenUrl, payload);
   persistTokensFromAuthResponse_(resp);
-  if (typeof RUN_FLAGS !== 'undefined') {
-    RUN_FLAGS.didRefresh = true;
-  }
+  RUN_FLAGS.didRefresh = true;
 }
 
 /**

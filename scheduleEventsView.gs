@@ -219,6 +219,8 @@ function createScheduledEventsView_(warehouseRecords) {
     // Create combined date+time values for sorting
     var dateStartTime = combineDateAndTime_(record.Date, startTime);
     var dateEndTime = combineDateAndTime_(record.Date, endTime);
+    var lastName = record.LastName;
+    var firstName = record.FirstName;
 
     // Look up phone numbers for participants
     var phones = lookupParticipantPhones_(record.ParticipantIds, phoneMap);
@@ -238,7 +240,9 @@ function createScheduledEventsView_(warehouseRecords) {
       'StartTime': startTime,
       'EndTime': endTime,
       'DateStartTime': dateStartTime,
-      'DateEndTime': dateEndTime
+      'DateEndTime': dateEndTime,
+      'FirstName' : firstName,
+      'LastName' : lastName,
     });
   });
 

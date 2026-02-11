@@ -314,7 +314,7 @@ var CONFIG_SCHEDULE_EVENTS = (function () {
     'SessionId', 'SessionStatus', 'CourtCaption', 'Staff', 'Rooms',
     'Resources', 'Location', 'Participants', 'ParticipantIds', 'ParticipantEmails',
     'ParticipantCount', 'Date', 'StartTime', 'EndTime', 'SetupTimeIncluded',
-    'CleanUpTimeIncluded', 'Notes', 'CanWaiveCancellationFee'
+    'CleanUpTimeIncluded', 'Notes', 'CanWaiveCancellationFee', 'FirstName', 'LastName'
   ];
 
   return ck_makeConfig_({
